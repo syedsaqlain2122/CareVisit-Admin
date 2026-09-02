@@ -6,7 +6,7 @@ import { useStore } from '@/lib/store';
 export function LoginPage() {
   const { currentAdmin, authReady, login } = useStore();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('saqlain@gmail.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
