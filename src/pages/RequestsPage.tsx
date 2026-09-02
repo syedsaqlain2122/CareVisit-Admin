@@ -1,35 +1,41 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { money, nurseName, useStore } from '@/lib/store';
-import type { VisitRequest, VisitStatus } from '@/lib/types';
-
-const STATUSES: VisitStatus[] = [
-  'pending',
-  'assigned',
-  'on_the_way',
-  'arrived',
-  'in_progress',
-  'completed',
-  'cancelled',
-];
+import { chipClass, isQueuedVisit, VISIT_STATUSES, type VisitRequest, type VisitStatus } from '@/lib/types';
 
 export function RequestsPage() {
   const { visits, nurses, assignVisit, setVisitStatus } = useStore();
   const [filter, setFilter] = useState<'all' | VisitStatus>('all');
-  const [selected, setSelected] = useState<VisitRequest | null>(visits.find((v) => v.status === 'pending') ?? visits[0] ?? null);
-  const [nurseId, setNurseId] = useState(nurses.find((n) => n.accepting)?.id ?? nurses[0]?.id ?? '');
+  const [selected, setSelected] = useState<VisitRequest | null>(null);
+  const [nurseId, setNurseId] = useState('');
   const [start, setStart] = useState('10:00');
   const [end, setEnd] = useState('12:00');
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelected((prev) => {
+      return (
+        (prev ? visits.find((v) => v.id === prev.id) : null) ??
+        visits.find((v) => isQueuedVisit(v.status)) ??
+        visits[0] ??
+        null
+      );
+    });
+  }, [visits]);
+
+  useEffect(() => {
+    setNurseId((prev) => prev || nurses.find((n) => n.accepting)?.id || nurses[0]?.id || '');
+  }, [nurses]);
 
   const rows = useMemo(
     () => (filter === 'all' ? visits : visits.filter((v) => v.status === filter)),
     [visits, filter],
   );
 
-  const onAssign = (e: FormEvent) => {
+  const onAssign = async (e: FormEvent) => {
     e.preventDefault();
-    if (!selected) return;
-    assignVisit(selected.id, nurseId, start, end);
-    setSelected({ ...selected, nurseId, windowStart: start, windowEnd: end, status: 'assigned' });
+    if (!selected || !nurseId) return;
+    const err = await assignVisit(selected.id, nurseId, start, end);
+    setMessage(err);
   };
 
   return (
@@ -41,7 +47,7 @@ export function RequestsPage() {
         </div>
         <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)}>
           <option value="all">All statuses</option>
-          {STATUSES.map((s) => (
+          {VISIT_STATUSES.map((s) => (
             <option key={s} value={s}>
               {s.replaceAll('_', ' ')}
             </option>
@@ -67,20 +73,23 @@ export function RequestsPage() {
                   onClick={() => {
                     setSelected(v);
                     if (v.nurseId) setNurseId(v.nurseId);
+                    if (v.windowStart) setStart(v.windowStart);
+                    if (v.windowEnd) setEnd(v.windowEnd);
                   }}
                   style={{ cursor: 'pointer', background: selected?.id === v.id ? '#eef2ff' : undefined }}
                 >
-                  <td>{v.id}</td>
+                  <td>{v.code}</td>
                   <td>{v.patientName}</td>
                   <td>{v.service}</td>
                   <td>{v.preferredDate}</td>
                   <td>
-                    <span className={`chip ${v.status}`}>{v.status.replaceAll('_', ' ')}</span>
+                    <span className={`chip ${chipClass(v.status)}`}>{v.status.replaceAll('_', ' ')}</span>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {rows.length === 0 ? <p className="muted">No visits in this filter. New bookings from the app appear here.</p> : null}
         </div>
         <div className="card stack">
           {selected ? (
@@ -100,10 +109,11 @@ export function RequestsPage() {
                   <strong>{money(selected.feePkr)}</strong> · {selected.durationDays} day(s) · pay nurse on arrival
                 </p>
               </div>
-              <form className="stack" onSubmit={onAssign}>
+              <form className="stack" onSubmit={(e) => void onAssign(e)}>
                 <div className="field">
                   <label>Nurse</label>
                   <select value={nurseId} onChange={(e) => setNurseId(e.target.value)}>
+                    {nurses.length === 0 ? <option value="">No nurses yet</option> : null}
                     {nurses.map((n) => (
                       <option key={n.id} value={n.id} disabled={!n.accepting}>
                         {n.name} {n.accepting ? '' : '(off)'}
@@ -121,7 +131,7 @@ export function RequestsPage() {
                     <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
                   </div>
                 </div>
-                <button className="btn btn-primary" type="submit">
+                <button className="btn btn-primary" type="submit" disabled={!nurseId}>
                   Assign nurse
                 </button>
               </form>
@@ -131,17 +141,17 @@ export function RequestsPage() {
                   value={selected.status}
                   onChange={(e) => {
                     const status = e.target.value as VisitStatus;
-                    setVisitStatus(selected.id, status);
-                    setSelected({ ...selected, status });
+                    void setVisitStatus(selected.id, status);
                   }}
                 >
-                  {STATUSES.map((s) => (
+                  {VISIT_STATUSES.map((s) => (
                     <option key={s} value={s}>
                       {s.replaceAll('_', ' ')}
                     </option>
                   ))}
                 </select>
               </div>
+              {message ? <div className="error">{message}</div> : null}
               <p className="muted">Currently: {nurseName(nurses, selected.nurseId)}</p>
             </>
           ) : (

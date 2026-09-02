@@ -1,4 +1,5 @@
 import { useStore } from '@/lib/store';
+import { chipClass } from '@/lib/types';
 
 export function PatientsPage() {
   const { patients, visits } = useStore();
@@ -32,13 +33,14 @@ export function PatientsPage() {
                 </td>
                 <td>{p.city}</td>
                 <td>
-                  <span className={`chip ${p.verification}`}>{p.verification.replaceAll('_', ' ')}</span>
+                  <span className={`chip ${chipClass(p.verification)}`}>{p.verification.replaceAll('_', ' ')}</span>
                 </td>
                 <td>{visits.filter((v) => v.patientId === p.id).length}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        {patients.length === 0 ? <p className="muted">No patients have signed up yet.</p> : null}
       </div>
     </>
   );

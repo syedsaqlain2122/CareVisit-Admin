@@ -1,4 +1,5 @@
 import { money, useStore } from '@/lib/store';
+import { chipClass } from '@/lib/types';
 
 export function PharmacyPage() {
   const { orders, setOrderStatus } = useStore();
@@ -27,25 +28,22 @@ export function PharmacyPage() {
           <tbody>
             {orders.map((o) => (
               <tr key={o.id}>
-                <td>{o.id}</td>
+                <td>{o.code}</td>
                 <td>{o.patientName}</td>
                 <td>{o.items}</td>
                 <td>{money(o.totalPkr)}</td>
                 <td>
-                  <span className={`chip ${o.status}`}>{o.status.replaceAll('_', ' ')}</span>
+                  <span className={`chip ${chipClass(o.status)}`}>{o.status.replaceAll('_', ' ')}</span>
                 </td>
                 <td>
                   <span className={`chip ${o.payment}`}>{o.payment.replaceAll('_', ' ')}</span>
                 </td>
                 <td>
                   <div className="row">
-                    <button className="btn btn-ghost btn-sm" onClick={() => setOrderStatus(o.id, 'out_for_delivery')}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => void setOrderStatus(o.id, 'out_for_delivery')}>
                       Dispatch
                     </button>
-                    <button
-                      className="btn btn-care btn-sm"
-                      onClick={() => setOrderStatus(o.id, 'delivered', 'cod_collected')}
-                    >
+                    <button className="btn btn-care btn-sm" onClick={() => void setOrderStatus(o.id, 'delivered')}>
                       Delivered + COD
                     </button>
                   </div>
@@ -54,6 +52,7 @@ export function PharmacyPage() {
             ))}
           </tbody>
         </table>
+        {orders.length === 0 ? <p className="muted">No pharmacy orders yet.</p> : null}
       </div>
     </>
   );

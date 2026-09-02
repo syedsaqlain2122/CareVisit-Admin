@@ -1,142 +1,371 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
-import { SEED } from './seed';
-import type {
-  AdminAccount,
-  PharmacyOrder,
-  StoreState,
-  VerificationStatus,
-  VisitStatus,
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
+import { invokeAdminAuth, supabase } from './supabase';
+import {
+  orderPayment,
+  type AdminAccount,
+  type Nurse,
+  type OrderStatus,
+  type Patient,
+  type PharmacyOrder,
+  type VerificationStatus,
+  type VisitRequest,
+  type VisitStatus,
 } from './types';
 
-const KEY = 'carevisit-admin-store-v1';
+type OneOrMany<T> = T | T[] | null;
 
-function load(): StoreState {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return structuredClone(SEED);
-    const parsed = JSON.parse(raw) as StoreState;
-    if (!Array.isArray(parsed.admins) || parsed.admins.length === 0) {
-      return { ...parsed, admins: structuredClone(SEED.admins) };
-    }
-    return parsed;
-  } catch {
-    return structuredClone(SEED);
-  }
+function first<T>(value: OneOrMany<T>): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
-function persist(state: StoreState) {
-  localStorage.setItem(KEY, JSON.stringify(state));
+function parseWindow(raw: string | null): { start: string | null; end: string | null } {
+  if (!raw) return { start: null, end: null };
+  const parts = raw.split(/[–-]/).map((s) => s.trim()).filter(Boolean);
+  return { start: parts[0] ?? null, end: parts[1] ?? null };
 }
 
-function uid(prefix: string) {
-  return `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
+function mapVisit(row: Record<string, unknown>): VisitRequest {
+  const patient = first(row.patient as OneOrMany<{ full_name?: string; phone?: string }>);
+  const service = first(row.service as OneOrMany<{ title?: string; requires_prescription?: boolean }>);
+  const address = first(row.address as OneOrMany<{ line?: string; area_label?: string; label?: string }>);
+  const window = parseWindow((row.preferred_window as string | null) ?? null);
+  const fee = Number(row.estimated_fee_pkr ?? 0);
+  return {
+    id: String(row.id),
+    code: String(row.public_code ?? row.id).slice(0, 12),
+    patientId: String(row.patient_id),
+    patientName: patient?.full_name || 'Patient',
+    patientPhone: patient?.phone || '—',
+    service: service?.title || 'Visit',
+    address: [address?.line, address?.area_label].filter(Boolean).join(', ') || '—',
+    preferredDate: (row.preferred_start_date as string | null) ?? 'Flexible',
+    durationDays: Number(row.duration_days ?? 1),
+    feePkr: Number.isFinite(fee) ? fee : 0,
+    status: (row.status as VisitStatus) ?? 'open',
+    nurseId: (row.assigned_nurse_id as string | null) ?? null,
+    windowStart: window.start,
+    windowEnd: window.end,
+    notes: (row.description as string | null) ?? '',
+    requiresRx: Boolean(service?.requires_prescription),
+    createdAt: String(row.created_at ?? ''),
+  };
 }
 
-type StoreApi = StoreState & {
+function mapNurse(row: Record<string, unknown>): Nurse {
+  const np = first(
+    row.nurse_profiles as OneOrMany<{
+      specialty?: string | null;
+      license_number?: string | null;
+      is_accepting_jobs?: boolean;
+      credentials_label?: string | null;
+    }>,
+  );
+  return {
+    id: String(row.id),
+    name: (row.full_name as string | null) || 'Nurse',
+    specialty: np?.specialty || np?.credentials_label || 'General nursing',
+    phone: (row.phone as string | null) || '—',
+    email: (row.email as string | null) || '—',
+    license: np?.license_number || '—',
+    accepting: np?.is_accepting_jobs ?? true,
+  };
+}
+
+function mapPatient(row: Record<string, unknown>): Patient {
+  const addresses = row.addresses as OneOrMany<{ area_label?: string | null; is_primary?: boolean; line?: string }> | undefined;
+  const list = !addresses ? [] : Array.isArray(addresses) ? addresses : [addresses];
+  const primary = list.find((a) => a.is_primary) ?? list[0];
+  return {
+    id: String(row.id),
+    name: (row.full_name as string | null) || 'Patient',
+    phone: (row.phone as string | null) || '—',
+    email: (row.email as string | null) || '—',
+    cnic: (row.cnic_number as string | null) || '—',
+    verification: ((row.verification_status as VerificationStatus) ?? 'unverified'),
+    city: primary?.area_label || '—',
+  };
+}
+
+function mapOrder(row: Record<string, unknown>): PharmacyOrder {
+  const patient = first(row.patient as OneOrMany<{ full_name?: string }>);
+  const items = row.order_items as OneOrMany<{ qty?: number; medicines?: OneOrMany<{ name?: string }> }> | undefined;
+  const list = !items ? [] : Array.isArray(items) ? items : [items];
+  const labels = list.map((item) => {
+    const med = first(item.medicines ?? null);
+    return `${item.qty ?? 1}× ${med?.name ?? 'Item'}`;
+  });
+  const status = (row.status as OrderStatus) ?? 'placed';
+  return {
+    id: String(row.id),
+    code: String(row.public_code ?? row.id).slice(0, 12),
+    patientName: patient?.full_name || 'Patient',
+    items: labels.join(', ') || '—',
+    totalPkr: Number(row.total_pkr ?? 0),
+    status,
+    payment: orderPayment(status),
+    createdAt: String(row.created_at ?? ''),
+  };
+}
+
+function mapAdmin(row: Record<string, unknown>): AdminAccount {
+  return {
+    id: String(row.id),
+    name: (row.full_name as string | null) || 'Admin',
+    email: (row.email as string | null) || '',
+    createdAt: String(row.created_at ?? ''),
+  };
+}
+
+type LiveState = {
+  nurses: Nurse[];
+  patients: Patient[];
+  visits: VisitRequest[];
+  orders: PharmacyOrder[];
+  admins: AdminAccount[];
+};
+
+const EMPTY: LiveState = {
+  nurses: [],
+  patients: [],
+  visits: [],
+  orders: [],
+  admins: [],
+};
+
+type StoreApi = LiveState & {
   currentAdmin: AdminAccount | null;
-  login: (email: string, password: string) => string | null;
-  logout: () => void;
-  addAdmin: (input: { name: string; email: string; password: string }) => string | null;
-  removeAdmin: (id: string) => string | null;
-  assignVisit: (id: string, nurseId: string, windowStart: string, windowEnd: string) => void;
-  setVisitStatus: (id: string, status: VisitStatus) => void;
-  setVerification: (patientId: string, status: VerificationStatus) => void;
-  setOrderStatus: (id: string, status: PharmacyOrder['status'], payment?: PharmacyOrder['payment']) => void;
-  toggleNurseAccepting: (id: string) => void;
+  authReady: boolean;
+  loading: boolean;
+  error: string | null;
+  login: (email: string, password: string) => Promise<string | null>;
+  logout: () => Promise<void>;
+  refresh: () => Promise<void>;
+  addAdmin: (input: { name: string; email: string; password: string }) => Promise<string | null>;
+  removeAdmin: (id: string) => Promise<string | null>;
+  assignVisit: (id: string, nurseId: string, windowStart: string, windowEnd: string) => Promise<string | null>;
+  setVisitStatus: (id: string, status: VisitStatus) => Promise<string | null>;
+  setVerification: (patientId: string, status: VerificationStatus) => Promise<string | null>;
+  setOrderStatus: (id: string, status: OrderStatus) => Promise<string | null>;
+  toggleNurseAccepting: (id: string) => Promise<string | null>;
 };
 
 const StoreContext = createContext<StoreApi | null>(null);
 
-export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<StoreState>(() => load());
+async function fetchLive(): Promise<LiveState> {
+  const [nursesRes, patientsRes, visitsRes, ordersRes, adminsRes] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select(
+        'id, full_name, phone, email, created_at, nurse_profiles (specialty, license_number, is_accepting_jobs, credentials_label)',
+      )
+      .eq('role', 'nurse')
+      .order('full_name'),
+    supabase
+      .from('profiles')
+      .select('id, full_name, phone, email, cnic_number, verification_status, addresses (area_label, is_primary, line)')
+      .eq('role', 'patient')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('visit_requests')
+      .select(
+        `
+        id, public_code, status, duration_days, estimated_fee_pkr,
+        preferred_start_date, preferred_window, description, assigned_nurse_id, patient_id, created_at,
+        patient:profiles!visit_requests_patient_id_fkey (full_name, phone),
+        service:services (title, requires_prescription),
+        address:addresses (line, area_label, label)
+      `,
+      )
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('orders')
+      .select(
+        `
+        id, public_code, status, total_pkr, created_at,
+        patient:profiles!orders_patient_id_fkey (full_name),
+        order_items (qty, medicines (name))
+      `,
+      )
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('profiles')
+      .select('id, full_name, email, created_at')
+      .eq('role', 'admin')
+      .order('created_at'),
+  ]);
 
-  const commit = (next: StoreState) => {
-    persist(next);
-    setState(next);
+  const firstError =
+    nursesRes.error?.message ||
+    patientsRes.error?.message ||
+    visitsRes.error?.message ||
+    ordersRes.error?.message ||
+    adminsRes.error?.message;
+  if (firstError) throw new Error(firstError);
+
+  return {
+    nurses: (nursesRes.data ?? []).map((row: Record<string, unknown>) => mapNurse(row)),
+    patients: (patientsRes.data ?? []).map((row: Record<string, unknown>) => mapPatient(row)),
+    visits: (visitsRes.data ?? []).map((row: Record<string, unknown>) => mapVisit(row)),
+    orders: (ordersRes.data ?? []).map((row: Record<string, unknown>) => mapOrder(row)),
+    admins: (adminsRes.data ?? []).map((row: Record<string, unknown>) => mapAdmin(row)),
   };
+}
 
-  const api = useMemo<StoreApi>(() => {
-    const currentAdmin = state.admins.find((a) => a.email === state.sessionEmail) ?? null;
+export function StoreProvider({ children }: { children: ReactNode }) {
+  const [authReady, setAuthReady] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [currentAdmin, setCurrentAdmin] = useState<AdminAccount | null>(null);
+  const [data, setData] = useState<LiveState>(EMPTY);
 
-    return {
-      ...state,
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const next = await fetchLive();
+      setData(next);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load live data.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event: string, session: { user?: { id: string; email?: string } } | null) => {
+      if (!session?.user) {
+        setCurrentAdmin(null);
+        setData(EMPTY);
+        setAuthReady(true);
+        return;
+      }
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, created_at, role')
+        .eq('id', session.user.id)
+        .maybeSingle();
+      if (profile?.role !== 'admin') {
+        await supabase.auth.signOut();
+        setCurrentAdmin(null);
+        setData(EMPTY);
+        setAuthReady(true);
+        return;
+      }
+      setCurrentAdmin({
+        id: profile.id,
+        name: profile.full_name || 'Admin',
+        email: profile.email || session.user.email || '',
+        createdAt: profile.created_at,
+      });
+      setAuthReady(true);
+      await refresh();
+    });
+    return () => sub.subscription.unsubscribe();
+  }, [refresh]);
+
+  const api = useMemo<StoreApi>(
+    () => ({
+      ...data,
       currentAdmin,
-      login: (email, password) => {
-        const match = state.admins.find(
-          (a) => a.email.toLowerCase() === email.trim().toLowerCase() && a.password === password,
+      authReady,
+      loading,
+      error,
+      refresh,
+      login: async (email, password) => {
+        const boot = await invokeAdminAuth({ action: 'bootstrap' }, false);
+        if (boot.error) return boot.error;
+        const { error: authError } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        if (authError) return authError.message;
+        const { data: userData } = await supabase.auth.getUser();
+        if (!userData.user) return 'Sign in failed.';
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userData.user.id)
+          .maybeSingle();
+        if (profile?.role !== 'admin') {
+          await supabase.auth.signOut();
+          return 'This account is not an admin.';
+        }
+        return null;
+      },
+      logout: async () => {
+        await supabase.auth.signOut();
+      },
+      addAdmin: async ({ name, email, password }) => {
+        const result = await invokeAdminAuth(
+          { action: 'create', name: name.trim(), email: email.trim().toLowerCase(), password },
+          true,
         );
-        if (!match) return 'Email or password is incorrect.';
-        commit({ ...state, sessionEmail: match.email });
+        if (result.error) return result.error;
+        await refresh();
         return null;
       },
-      logout: () => commit({ ...state, sessionEmail: null }),
-      addAdmin: ({ name, email, password }) => {
-        const e = email.trim().toLowerCase();
-        if (!name.trim() || !e || !password) return 'All fields are required.';
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return 'Enter a valid email.';
-        if (password.length < 6) return 'Password must be at least 6 characters.';
-        if (state.admins.some((a) => a.email.toLowerCase() === e)) return 'That email is already an admin.';
-        commit({
-          ...state,
-          admins: [
-            ...state.admins,
-            {
-              id: uid('admin'),
-              name: name.trim(),
-              email: e,
-              password,
-              createdAt: new Date().toISOString(),
-            },
-          ],
-        });
+      removeAdmin: async (id) => {
+        const result = await invokeAdminAuth({ action: 'delete', userId: id }, true);
+        if (result.error) return result.error;
+        await refresh();
         return null;
       },
-      removeAdmin: (id) => {
-        const target = state.admins.find((a) => a.id === id);
-        if (!target) return 'Admin not found.';
-        if (state.admins.length === 1) return 'Keep at least one admin account.';
-        if (target.email === state.sessionEmail) return 'You cannot remove the signed-in account.';
-        commit({ ...state, admins: state.admins.filter((a) => a.id !== id) });
+      assignVisit: async (id, nurseId, windowStart, windowEnd) => {
+        const { error: updateError } = await supabase
+          .from('visit_requests')
+          .update({
+            assigned_nurse_id: nurseId,
+            preferred_window: `${windowStart}–${windowEnd}`,
+            status: 'assigned',
+          })
+          .eq('id', id);
+        if (updateError) return updateError.message;
+        await refresh();
         return null;
       },
-      assignVisit: (id, nurseId, windowStart, windowEnd) => {
-        commit({
-          ...state,
-          visits: state.visits.map((v) =>
-            v.id === id
-              ? { ...v, nurseId, windowStart, windowEnd, status: 'assigned' as VisitStatus }
-              : v,
-          ),
-        });
+      setVisitStatus: async (id, status) => {
+        const { error: updateError } = await supabase.from('visit_requests').update({ status }).eq('id', id);
+        if (updateError) return updateError.message;
+        await refresh();
+        return null;
       },
-      setVisitStatus: (id, status) => {
-        commit({
-          ...state,
-          visits: state.visits.map((v) => (v.id === id ? { ...v, status } : v)),
-        });
+      setVerification: async (patientId, status) => {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ verification_status: status })
+          .eq('id', patientId);
+        if (updateError) return updateError.message;
+        await refresh();
+        return null;
       },
-      setVerification: (patientId, status) => {
-        commit({
-          ...state,
-          patients: state.patients.map((p) => (p.id === patientId ? { ...p, verification: status } : p)),
-        });
+      setOrderStatus: async (id, status) => {
+        const { error: updateError } = await supabase.from('orders').update({ status }).eq('id', id);
+        if (updateError) return updateError.message;
+        await refresh();
+        return null;
       },
-      setOrderStatus: (id, status, payment) => {
-        commit({
-          ...state,
-          orders: state.orders.map((o) =>
-            o.id === id ? { ...o, status, payment: payment ?? o.payment } : o,
-          ),
-        });
+      toggleNurseAccepting: async (id) => {
+        const nurse = data.nurses.find((n) => n.id === id);
+        const { error: updateError } = await supabase
+          .from('nurse_profiles')
+          .update({ is_accepting_jobs: !(nurse?.accepting ?? true) })
+          .eq('profile_id', id);
+        if (updateError) return updateError.message;
+        await refresh();
+        return null;
       },
-      toggleNurseAccepting: (id) => {
-        commit({
-          ...state,
-          nurses: state.nurses.map((n) => (n.id === id ? { ...n, accepting: !n.accepting } : n)),
-        });
-      },
-    };
-  }, [state]);
+    }),
+    [data, currentAdmin, authReady, loading, error, refresh],
+  );
 
   return <StoreContext.Provider value={api}>{children}</StoreContext.Provider>;
 }

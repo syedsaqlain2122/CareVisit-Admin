@@ -14,7 +14,7 @@ const NAV = [
 ];
 
 export function AppLayout() {
-  const { currentAdmin, logout } = useStore();
+  const { currentAdmin, logout, loading, error, refresh } = useStore();
   const navigate = useNavigate();
 
   return (
@@ -47,8 +47,8 @@ export function AppLayout() {
           <button
             className="btn btn-ghost btn-sm"
             style={{ marginTop: 10, color: '#fff', borderColor: 'rgba(255,255,255,0.2)', width: '100%' }}
-            onClick={() => {
-              logout();
+            onClick={async () => {
+              await logout();
               navigate('/login');
             }}
           >
@@ -57,6 +57,15 @@ export function AppLayout() {
         </div>
       </aside>
       <main className="main">
+        {error ? (
+          <div className="error" style={{ marginBottom: 12 }}>
+            {error}{' '}
+            <button className="btn btn-ghost btn-sm" type="button" onClick={() => void refresh()}>
+              Retry
+            </button>
+          </div>
+        ) : null}
+        {loading ? <p className="muted" style={{ marginTop: 0 }}>Refreshing live data…</p> : null}
         <Outlet />
       </main>
     </div>

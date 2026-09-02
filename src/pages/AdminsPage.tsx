@@ -8,10 +8,13 @@ export function AdminsPage() {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const err = addAdmin({ name, email, password });
+    setBusy(true);
+    const err = await addAdmin({ name, email, password });
+    setBusy(false);
     if (err) {
       setOk(false);
       setMessage(err);
@@ -29,13 +32,13 @@ export function AdminsPage() {
       <div className="page-head">
         <div>
           <h2>Admin users</h2>
-          <p>Operators who can sign into this portal. New accounts can log in immediately with the password you set.</p>
+          <p>Operators who can sign into this portal. New accounts are created in the same CareVisit Supabase project.</p>
         </div>
       </div>
       <div className="grid-2">
         <div className="card stack">
           <h3 style={{ margin: 0 }}>Add admin</h3>
-          <form className="stack" onSubmit={onSubmit}>
+          <form className="stack" onSubmit={(e) => void onSubmit(e)}>
             <div className="field">
               <label>Full name</label>
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
@@ -49,8 +52,8 @@ export function AdminsPage() {
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Min 6 characters" />
             </div>
             {message ? <div className={ok ? 'muted' : 'error'}>{message}</div> : null}
-            <button className="btn btn-primary" type="submit">
-              Create admin
+            <button className="btn btn-primary" type="submit" disabled={busy}>
+              {busy ? 'Creating…' : 'Create admin'}
             </button>
           </form>
         </div>
@@ -72,7 +75,16 @@ export function AdminsPage() {
                   </td>
                   <td>{a.email}</td>
                   <td>
-                    <button className="btn btn-danger btn-sm" onClick={() => removeAdmin(a.id)}>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={async () => {
+                        const err = await removeAdmin(a.id);
+                        if (err) {
+                          setOk(false);
+                          setMessage(err);
+                        }
+                      }}
+                    >
                       Remove
                     </button>
                   </td>

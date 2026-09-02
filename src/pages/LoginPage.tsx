@@ -3,17 +3,28 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useStore } from '@/lib/store';
 
 export function LoginPage() {
-  const { currentAdmin, login } = useStore();
+  const { currentAdmin, authReady, login } = useStore();
   const navigate = useNavigate();
   const [email, setEmail] = useState('saqlain@gmail.com');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  if (!authReady) {
+    return (
+      <div className="login-wrap">
+        <p className="muted">Connecting to CareVisit…</p>
+      </div>
+    );
+  }
 
   if (currentAdmin) return <Navigate to="/" replace />;
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const msg = login(email, password);
+    setBusy(true);
+    const msg = await login(email, password);
+    setBusy(false);
     if (msg) {
       setError(msg);
       return;
@@ -39,7 +50,7 @@ export function LoginPage() {
           </div>
         </div>
         <p className="muted">
-          Sign in to triage visit requests, assign nurses, review IDs, and manage operators.
+          Sign in to triage visit requests, assign nurses, review IDs, and manage operators. Live data from the CareVisit app.
         </p>
         <form className="stack" onSubmit={onSubmit}>
           <div className="field">
@@ -69,8 +80,8 @@ export function LoginPage() {
             />
           </div>
           {error ? <div className="error">{error}</div> : null}
-          <button className="btn btn-primary" type="submit">
-            Sign in
+          <button className="btn btn-primary" type="submit" disabled={busy}>
+            {busy ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
         <p className="muted">

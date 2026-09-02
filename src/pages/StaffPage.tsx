@@ -8,9 +8,10 @@ export function StaffPage() {
       <div className="page-head">
         <div>
           <h2>Staff roster</h2>
-          <p>Nurses and caregivers available for assignment. Toggle accepting jobs if someone is off shift.</p>
+          <p>Nurses and caregivers from the CareVisit app. Toggle accepting jobs if someone is off shift.</p>
         </div>
       </div>
+      {nurses.length === 0 ? <p className="muted">No nurses have signed up yet.</p> : null}
       <div className="grid-3">
         {nurses.map((n) => {
           const load = visits.filter((v) => v.nurseId === n.id && !['completed', 'cancelled'].includes(v.status)).length;
@@ -28,13 +29,12 @@ export function StaffPage() {
                 {n.email}
               </div>
               <div className="row">
-                <span className="chip approved">★ {n.rating.toFixed(1)}</span>
                 <span className="chip pending">{load} active jobs</span>
                 <span className={`chip ${n.accepting ? 'approved' : 'cancelled'}`}>
                   {n.accepting ? 'Accepting' : 'Off'}
                 </span>
               </div>
-              <button className="btn btn-ghost" onClick={() => toggleNurseAccepting(n.id)}>
+              <button className="btn btn-ghost" onClick={() => void toggleNurseAccepting(n.id)}>
                 {n.accepting ? 'Mark off duty' : 'Mark accepting jobs'}
               </button>
             </div>

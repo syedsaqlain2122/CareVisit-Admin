@@ -1,4 +1,5 @@
 import { money, useStore } from '@/lib/store';
+import { chipClass } from '@/lib/types';
 
 export function PaymentsPage() {
   const { visits, orders } = useStore();
@@ -41,7 +42,7 @@ export function PaymentsPage() {
           <tbody>
             {visits.map((v) => (
               <tr key={v.id}>
-                <td>Home visit {v.id}</td>
+                <td>Home visit {v.code}</td>
                 <td>{v.patientName}</td>
                 <td>{money(v.feePkr)}</td>
                 <td>
@@ -53,16 +54,17 @@ export function PaymentsPage() {
             ))}
             {orders.map((o) => (
               <tr key={o.id}>
-                <td>Pharmacy {o.id}</td>
+                <td>Pharmacy {o.code}</td>
                 <td>{o.patientName}</td>
                 <td>{money(o.totalPkr)}</td>
                 <td>
-                  <span className={`chip ${o.payment}`}>{o.payment.replaceAll('_', ' ')}</span>
+                  <span className={`chip ${chipClass(o.payment)}`}>{o.payment.replaceAll('_', ' ')}</span>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        {visits.length === 0 && orders.length === 0 ? <p className="muted">No payments yet.</p> : null}
       </div>
     </>
   );

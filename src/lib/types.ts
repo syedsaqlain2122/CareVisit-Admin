@@ -1,5 +1,7 @@
 export type VisitStatus =
-  | 'pending'
+  | 'draft'
+  | 'pending_review'
+  | 'open'
   | 'assigned'
   | 'on_the_way'
   | 'arrived'
@@ -9,11 +11,12 @@ export type VisitStatus =
 
 export type VerificationStatus = 'unverified' | 'under_review' | 'approved' | 'rejected';
 
+export type OrderStatus = 'placed' | 'confirmed' | 'out_for_delivery' | 'delivered' | 'cancelled';
+
 export type AdminAccount = {
   id: string;
   name: string;
   email: string;
-  password: string;
   createdAt: string;
 };
 
@@ -25,7 +28,6 @@ export type Nurse = {
   email: string;
   license: string;
   accepting: boolean;
-  rating: number;
 };
 
 export type Patient = {
@@ -40,6 +42,7 @@ export type Patient = {
 
 export type VisitRequest = {
   id: string;
+  code: string;
   patientId: string;
   patientName: string;
   patientPhone: string;
@@ -59,19 +62,38 @@ export type VisitRequest = {
 
 export type PharmacyOrder = {
   id: string;
+  code: string;
   patientName: string;
   items: string;
   totalPkr: number;
-  status: 'pending' | 'out_for_delivery' | 'delivered' | 'cancelled';
+  status: OrderStatus;
   payment: 'cod_unpaid' | 'cod_collected';
   createdAt: string;
 };
 
-export type StoreState = {
-  admins: AdminAccount[];
-  sessionEmail: string | null;
-  nurses: Nurse[];
-  patients: Patient[];
-  visits: VisitRequest[];
-  orders: PharmacyOrder[];
-};
+export const VISIT_STATUSES: VisitStatus[] = [
+  'open',
+  'pending_review',
+  'assigned',
+  'on_the_way',
+  'arrived',
+  'in_progress',
+  'completed',
+  'cancelled',
+];
+
+export function isQueuedVisit(status: VisitStatus) {
+  return status === 'open' || status === 'pending_review' || status === 'draft';
+}
+
+export function chipClass(status: string) {
+  if (status === 'open' || status === 'draft' || status === 'pending_review' || status === 'placed') {
+    return 'pending';
+  }
+  if (status === 'confirmed') return 'assigned';
+  return status;
+}
+
+export function orderPayment(status: OrderStatus): PharmacyOrder['payment'] {
+  return status === 'delivered' ? 'cod_collected' : 'cod_unpaid';
+}

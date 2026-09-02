@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
 import { money, nurseName, useStore } from '@/lib/store';
+import { chipClass, isQueuedVisit } from '@/lib/types';
 
 export function DashboardPage() {
   const { visits, patients, orders, nurses, currentAdmin } = useStore();
-  const pending = visits.filter((v) => v.status === 'pending').length;
+  const pending = visits.filter((v) => isQueuedVisit(v.status)).length;
   const live = visits.filter((v) => ['assigned', 'on_the_way', 'arrived', 'in_progress'].includes(v.status)).length;
   const review = patients.filter((p) => p.verification === 'under_review').length;
   const cod = orders.filter((o) => o.payment === 'cod_unpaid').reduce((s, o) => s + o.totalPkr, 0);
@@ -13,7 +14,7 @@ export function DashboardPage() {
       <div className="page-head">
         <div>
           <h2>Overview</h2>
-          <p>Hello, {currentAdmin?.name.split(' ')[0]}. Cash-on-delivery ops for CareVisit.</p>
+          <p>Hello, {currentAdmin?.name.split(' ')[0]}. Live queue from the CareVisit app — cash on delivery only.</p>
         </div>
       </div>
       <div className="grid-4" style={{ marginBottom: 18 }}>
@@ -53,16 +54,17 @@ export function DashboardPage() {
               <tbody>
                 {visits.slice(0, 5).map((v) => (
                   <tr key={v.id}>
-                    <td>{v.id}</td>
+                    <td>{v.code}</td>
                     <td>{v.patientName}</td>
                     <td>{v.service}</td>
                     <td>
-                      <span className={`chip ${v.status}`}>{v.status.replaceAll('_', ' ')}</span>
+                      <span className={`chip ${chipClass(v.status)}`}>{v.status.replaceAll('_', ' ')}</span>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            {visits.length === 0 ? <p className="muted">No visit requests yet.</p> : null}
           </div>
         </div>
         <div className="card">
@@ -70,6 +72,7 @@ export function DashboardPage() {
             <h3 style={{ margin: 0 }}>Nurses on shift</h3>
             <Link to="/staff">Roster</Link>
           </div>
+          {nurses.length === 0 ? <p className="muted">No nurses on the roster yet.</p> : null}
           {nurses.map((n) => (
             <div key={n.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
               <div>
@@ -108,6 +111,7 @@ export function DashboardPage() {
                 ))}
             </tbody>
           </table>
+          {visits.every((v) => !v.nurseId) ? <p className="muted">No assigned visits yet.</p> : null}
         </div>
       </div>
     </>

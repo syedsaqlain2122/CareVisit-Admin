@@ -16,7 +16,7 @@ export function ReportsPage() {
       <div className="page-head">
         <div>
           <h2>Reports</h2>
-          <p>Simple ops snapshot for CareVisit. Live GPS map is out of scope for v1 — status tracking only.</p>
+          <p>Ops snapshot from live CareVisit data. Live GPS map is out of scope for v1 — status tracking only.</p>
         </div>
       </div>
       <div className="grid-4" style={{ marginBottom: 16 }}>
@@ -40,6 +40,7 @@ export function ReportsPage() {
       <div className="grid-2">
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Volume by service</h3>
+          {Object.keys(byService).length === 0 ? <p className="muted">No visits yet.</p> : null}
           {Object.entries(byService).map(([name, count]) => (
             <div key={name} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
               <span>{name}</span>

@@ -2,6 +2,8 @@
 
 Operations portal for CareVisit home healthcare. Triage visit requests, assign nurses, review IDs, track cash-on-delivery, and manage admin operators.
 
+Uses the **same Supabase project** as the patient/nurse app (`mgomkwhyrcriwlysjphm`). Empty lists mean nobody has signed up or booked yet — not dummy seed data.
+
 **Live:** [https://syedsaqlain2122.github.io/CareVisit-Admin/](https://syedsaqlain2122.github.io/CareVisit-Admin/)
 
 ## Sign in
@@ -16,6 +18,7 @@ Add more admins from **Admin users** after you sign in.
 
 ```bash
 npm install
+cp env.example .env   # optional; defaults match the CareVisit project
 npm run dev
 ```
 

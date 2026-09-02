@@ -16,7 +16,7 @@ Aligned with `PROJECT_SPEC.md` Phase 3, minus a live GPS map (status tracker onl
 
 1. **Login** — founder account `saqlain@gmail.com` / `123123`. Additional admins can be created in-app.
 2. **Overview** — pending requests, live visits, ID reviews, COD outstanding.
-3. **Visit queue** — assign a nurse + time window, advance status (`pending` → `completed` / `cancelled`).
+3. **Visit queue** — assign a nurse + time window, advance status (`open` → `assigned` → `completed` / `cancelled`).
 4. **ID review** — approve or reject patient verification so they can book.
 5. **Staff roster** — nurses, specialty, license, accepting jobs.
 6. **Patients** — directory of app users.
@@ -27,13 +27,13 @@ Aligned with `PROJECT_SPEC.md` Phase 3, minus a live GPS map (status tracker onl
 
 ## Auth model (GitHub Pages)
 
-GitHub Pages is static hosting. The portal **cannot** hold a Supabase `service_role` key (it would be public). Admin login is therefore **local to the browser** (`localStorage`):
+GitHub Pages is static hosting, so the portal **cannot** hold a Supabase `service_role` key. It uses the public **anon** key plus an admin JWT:
 
-- Seed operator: Saqlain (the credentials above).
-- New admins are stored in the same browser workspace.
-- Clearing site data resets to the seed account.
+- Sign-in is `supabase.auth.signInWithPassword`. First visit bootstraps founder `saqlain@gmail.com` via the `admin-auth` Edge Function (service role stays on the server).
+- RLS `is_admin()` lets that session read/update visits, profiles, orders, and nurse roster.
+- Creating more admins also goes through `admin-auth` (Auth Admin API cannot run in the browser).
 
-When we later attach a real admin `profiles.role = 'admin'` user in Supabase Auth, swap `src/lib/store.tsx` login for `supabase.auth.signInWithPassword` and keep the same screens.
+Clearing site data only signs you out; live rows stay in Supabase.
 
 ## Design
 
@@ -44,4 +44,3 @@ Matches the mobile design system: primary `#2451F0`, deep `#131B4D`, care teal `
 - Live ops map / GPS
 - Card payments
 - Sending SMS OTP from the portal (that stays in the mobile app + Edge Functions)
-- Writing to production Supabase from the browser without an admin JWT

@@ -137,8 +137,8 @@ th { color: var(--ink-500); font-weight: 500; font-size: 12px; text-transform: u
   font-weight: 600;
   font-family: var(--display);
 }
-.chip.pending, .chip.unverified { background: #eef2ff; color: var(--primary); }
-.chip.assigned, .chip.under_review { background: var(--warning-tint); color: var(--warning); }
+.chip.pending, .chip.unverified, .chip.open, .chip.draft, .chip.pending_review, .chip.placed, .chip.cod_unpaid { background: #eef2ff; color: var(--primary); }
+.chip.assigned, .chip.under_review, .chip.confirmed { background: var(--warning-tint); color: var(--warning); }
 .chip.on_the_way, .chip.arrived, .chip.in_progress, .chip.out_for_delivery { background: #e6f8f3; color: var(--care); }
 .chip.completed, .chip.approved, .chip.delivered, .chip.cod_collected { background: #e9f8f1; color: var(--success); }
 .chip.cancelled, .chip.rejected, .chip.danger { background: #fdecec; color: var(--danger); }

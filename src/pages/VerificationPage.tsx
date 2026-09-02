@@ -1,4 +1,5 @@
 import { useStore } from '@/lib/store';
+import { chipClass } from '@/lib/types';
 
 export function VerificationPage() {
   const { patients, setVerification } = useStore();
@@ -32,14 +33,14 @@ export function VerificationPage() {
                 <td>{p.cnic}</td>
                 <td>{p.city}</td>
                 <td>
-                  <span className={`chip ${p.verification}`}>{p.verification.replaceAll('_', ' ')}</span>
+                  <span className={`chip ${chipClass(p.verification)}`}>{p.verification.replaceAll('_', ' ')}</span>
                 </td>
                 <td>
                   <div className="row">
-                    <button className="btn btn-care btn-sm" onClick={() => setVerification(p.id, 'approved')}>
+                    <button className="btn btn-care btn-sm" onClick={() => void setVerification(p.id, 'approved')}>
                       Approve
                     </button>
-                    <button className="btn btn-danger btn-sm" onClick={() => setVerification(p.id, 'rejected')}>
+                    <button className="btn btn-danger btn-sm" onClick={() => void setVerification(p.id, 'rejected')}>
                       Reject
                     </button>
                   </div>
@@ -48,7 +49,8 @@ export function VerificationPage() {
             ))}
           </tbody>
         </table>
-        {queue.length === 0 ? <p className="muted">No pending reviews.</p> : null}
+        {patients.length === 0 ? <p className="muted">No patients yet.</p> : null}
+        {patients.length > 0 && queue.length === 0 ? <p className="muted">No pending reviews.</p> : null}
       </div>
     </>
   );
