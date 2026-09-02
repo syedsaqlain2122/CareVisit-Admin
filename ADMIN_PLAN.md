@@ -14,7 +14,7 @@ Internal operations portal for [CareVisit](https://github.com/syedsaqlain2122) �
 
 Aligned with `PROJECT_SPEC.md` Phase 3, minus a live GPS map (status tracker only, same as the mobile app).
 
-1. **Login** — founder account `saqlain@gmail.com` / `123123`. Additional admins can be created in-app.
+1. **Login** — operator email/password. Additional admins can be created in-app.
 2. **Overview** — pending requests, live visits, ID reviews, COD outstanding.
 3. **Visit queue** — assign a nurse + time window, advance status (`open` → `assigned` → `completed` / `cancelled`).
 4. **ID review** — approve or reject patient verification so they can book.

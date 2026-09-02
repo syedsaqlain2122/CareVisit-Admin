@@ -96,9 +96,6 @@ export function LoginPage() {
               {busy ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
-          <p className="muted">
-            Founder login: <strong>saqlain@gmail.com</strong> / <strong>123123</strong>
-          </p>
         </div>
       </section>
     </div>

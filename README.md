@@ -8,11 +8,7 @@ Uses the **same Supabase project** as the patient/nurse app (`mgomkwhyrcriwlysjp
 
 ## Sign in
 
-| Email | Password |
-|---|---|
-| `saqlain@gmail.com` | `123123` |
-
-Add more admins from **Admin users** after you sign in.
+Use your operator email and password. Add more admins from **Admin users** after you sign in.
 
 ## Local development
 
