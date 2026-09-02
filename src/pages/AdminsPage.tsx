@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react';
+import { EmptyState, PersonCell } from '@/components/ui';
 import { useStore } from '@/lib/store';
 
 export function AdminsPage() {
@@ -31,8 +32,9 @@ export function AdminsPage() {
     <>
       <div className="page-head">
         <div>
+          <div className="eyebrow">Access</div>
           <h2>Admin users</h2>
-          <p>Operators who can sign into this portal. New accounts are created in the same CareVisit Supabase project.</p>
+          <p>Operators who can sign into this portal. New accounts are created in the same CareVisit project.</p>
         </div>
       </div>
       <div className="grid-2">
@@ -51,47 +53,55 @@ export function AdminsPage() {
               <label>Password</label>
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Min 6 characters" />
             </div>
-            {message ? <div className={ok ? 'muted' : 'error'}>{message}</div> : null}
+            {message ? <div className={ok ? 'ok' : 'error'}>{message}</div> : null}
             <button className="btn btn-primary" type="submit" disabled={busy}>
               {busy ? 'Creating…' : 'Create admin'}
             </button>
           </form>
         </div>
-        <div className="card table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {admins.map((a) => (
-                <tr key={a.id}>
-                  <td>
-                    {a.name}
-                    {a.email === currentAdmin?.email ? <span className="muted"> · you</span> : null}
-                  </td>
-                  <td>{a.email}</td>
-                  <td>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={async () => {
-                        const err = await removeAdmin(a.id);
-                        if (err) {
-                          setOk(false);
-                          setMessage(err);
-                        }
-                      }}
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="card card-flush">
+          {admins.length === 0 ? (
+            <EmptyState title="No operators" body="The founder account will appear here after the first sign-in." />
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {admins.map((a) => (
+                    <tr key={a.id}>
+                      <td>
+                        <PersonCell
+                          name={a.name}
+                          meta={a.email === currentAdmin?.email ? 'You' : undefined}
+                        />
+                      </td>
+                      <td>{a.email}</td>
+                      <td>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={async () => {
+                            const err = await removeAdmin(a.id);
+                            if (err) {
+                              setOk(false);
+                              setMessage(err);
+                            }
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </>

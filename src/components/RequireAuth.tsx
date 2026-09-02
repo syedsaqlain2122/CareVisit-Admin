@@ -6,7 +6,14 @@ export function RequireAuth() {
   if (!authReady) {
     return (
       <div className="login-wrap">
-        <p className="muted">Loading session…</p>
+        <div className="empty">
+          <div className="empty-art" aria-hidden>
+            <span className="empty-orb empty-orb-a" />
+            <span className="empty-orb empty-orb-b" />
+            <span className="empty-plus">+</span>
+          </div>
+          <p className="muted">Loading session…</p>
+        </div>
       </div>
     );
   }

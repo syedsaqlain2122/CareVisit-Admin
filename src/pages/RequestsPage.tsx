@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { EmptyState, PersonCell } from '@/components/ui';
 import { money, nurseName, useStore } from '@/lib/store';
 import { chipClass, isQueuedVisit, VISIT_STATUSES, type VisitRequest, type VisitStatus } from '@/lib/types';
 
@@ -42,71 +43,88 @@ export function RequestsPage() {
     <>
       <div className="page-head">
         <div>
+          <div className="eyebrow">Queue</div>
           <h2>Visit queue</h2>
-          <p>Triage incoming home-care requests, assign a nurse, and set a time window. COD only — no cards.</p>
+          <p>Triage incoming home-care requests, assign a nurse, and set a time window. COD only.</p>
         </div>
-        <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)}>
-          <option value="all">All statuses</option>
-          {VISIT_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s.replaceAll('_', ' ')}
-            </option>
-          ))}
-        </select>
+      </div>
+      <div className="pills" style={{ marginBottom: 16 }}>
+        <button type="button" className={`pill${filter === 'all' ? ' on' : ''}`} onClick={() => setFilter('all')}>
+          All
+        </button>
+        {VISIT_STATUSES.map((s) => (
+          <button
+            key={s}
+            type="button"
+            className={`pill${filter === s ? ' on' : ''}`}
+            onClick={() => setFilter(s)}
+          >
+            {s.replaceAll('_', ' ')}
+          </button>
+        ))}
       </div>
       <div className="grid-2">
-        <div className="card table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Patient</th>
-                <th>Service</th>
-                <th>When</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((v) => (
-                <tr
-                  key={v.id}
-                  onClick={() => {
-                    setSelected(v);
-                    if (v.nurseId) setNurseId(v.nurseId);
-                    if (v.windowStart) setStart(v.windowStart);
-                    if (v.windowEnd) setEnd(v.windowEnd);
-                  }}
-                  style={{ cursor: 'pointer', background: selected?.id === v.id ? '#eef2ff' : undefined }}
-                >
-                  <td>{v.code}</td>
-                  <td>{v.patientName}</td>
-                  <td>{v.service}</td>
-                  <td>{v.preferredDate}</td>
-                  <td>
-                    <span className={`chip ${chipClass(v.status)}`}>{v.status.replaceAll('_', ' ')}</span>
-                  </td>
+        <div className="card card-flush table-wrap">
+          {rows.length === 0 ? (
+            <EmptyState title="Nothing in this filter" body="New bookings from the app appear here." />
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Patient</th>
+                  <th>When</th>
+                  <th>Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {rows.length === 0 ? <p className="muted">No visits in this filter. New bookings from the app appear here.</p> : null}
+              </thead>
+              <tbody>
+                {rows.map((v) => (
+                  <tr
+                    key={v.id}
+                    className={selected?.id === v.id ? 'is-selected' : undefined}
+                    onClick={() => {
+                      setSelected(v);
+                      if (v.nurseId) setNurseId(v.nurseId);
+                      if (v.windowStart) setStart(v.windowStart);
+                      if (v.windowEnd) setEnd(v.windowEnd);
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <td className="mono">{v.code}</td>
+                    <td>
+                      <PersonCell name={v.patientName} meta={v.service} />
+                    </td>
+                    <td>{v.preferredDate}</td>
+                    <td>
+                      <span className={`chip ${chipClass(v.status)}`}>{v.status.replaceAll('_', ' ')}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
-        <div className="card stack">
+        <div className="card stack assign-panel">
           {selected ? (
             <>
               <div>
-                <div className="muted">Assign staff</div>
-                <h3 style={{ margin: '4px 0 0' }}>
-                  {selected.patientName} · {selected.service}
+                <div className="panel-kicker">Assign staff</div>
+                <h3 style={{ margin: '6px 0 0', fontSize: 22 }}>
+                  {selected.patientName}
                 </h3>
-                <p className="muted">
-                  {selected.address}
-                  <br />
-                  {selected.notes}
+                <p className="muted" style={{ marginTop: 6 }}>
+                  {selected.service} · {selected.address}
+                  {selected.notes ? (
+                    <>
+                      <br />
+                      {selected.notes}
+                    </>
+                  ) : null}
                   {selected.requiresRx ? ' · Prescription required' : ''}
                 </p>
                 <p>
-                  <strong>{money(selected.feePkr)}</strong> · {selected.durationDays} day(s) · pay nurse on arrival
+                  <strong>{money(selected.feePkr)}</strong>
+                  <span className="muted"> · {selected.durationDays} day(s) · pay nurse on arrival</span>
                 </p>
               </div>
               <form className="stack" onSubmit={(e) => void onAssign(e)}>
@@ -155,7 +173,7 @@ export function RequestsPage() {
               <p className="muted">Currently: {nurseName(nurses, selected.nurseId)}</p>
             </>
           ) : (
-            <p className="muted">Select a request from the queue.</p>
+            <EmptyState title="Select a request" body="Choose a visit on the left to assign a nurse." />
           )}
         </div>
       </div>

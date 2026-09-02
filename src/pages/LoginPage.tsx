@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { BrandMark } from '@/components/ui';
 import { useStore } from '@/lib/store';
 
 export function LoginPage() {
@@ -13,7 +14,14 @@ export function LoginPage() {
   if (!authReady) {
     return (
       <div className="login-wrap">
-        <p className="muted">Connecting to CareVisit…</p>
+        <div className="empty">
+          <div className="empty-art" aria-hidden>
+            <span className="empty-orb empty-orb-a" />
+            <span className="empty-orb empty-orb-b" />
+            <span className="empty-plus">+</span>
+          </div>
+          <p className="muted">Connecting to CareVisit…</p>
+        </div>
       </div>
     );
   }
@@ -33,61 +41,66 @@ export function LoginPage() {
   };
 
   return (
-    <div className="login-wrap">
-      <div className="card login-card stack">
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <svg width="40" height="40" viewBox="0 0 32 32" fill="none" aria-hidden>
-            <rect width="32" height="32" rx="8" fill="#131B4D" />
-            <circle cx="13" cy="16" r="6" fill="#2451F0" />
-            <circle cx="19" cy="16" r="6" fill="#17B897" fillOpacity="0.92" />
-            <path d="M16 13v6M13 16h6" stroke="white" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
-          <div>
-            <div className="display" style={{ fontSize: 12, letterSpacing: 1.4, color: '#2451F0' }}>
-              CAREVIST ADMIN
-            </div>
-            <h2 style={{ margin: '2px 0 0', fontSize: 26 }}>Welcome back</h2>
+    <div className="login-shell">
+      <section className="login-hero">
+        <div>
+          <BrandMark size={48} />
+          <h1>Calm ops for home care.</h1>
+          <p>Triage visits, assign nurses, and collect cash on delivery — same live data as the CareVisit app.</p>
+          <div className="login-pills">
+            <span>Visit queue</span>
+            <span>ID review</span>
+            <span>COD only</span>
           </div>
         </div>
-        <p className="muted">
-          Sign in to triage visit requests, assign nurses, review IDs, and manage operators. Live data from the CareVisit app.
+        <p className="muted" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          CareVisit Admin
         </p>
-        <form className="stack" onSubmit={onSubmit}>
-          <div className="field">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="username"
-              value={email}
-              onChange={(e) => {
-                setError(null);
-                setEmail(e.target.value);
-              }}
-            />
+      </section>
+      <section className="login-form-wrap">
+        <div className="card login-card stack">
+          <div>
+            <div className="eyebrow">Sign in</div>
+            <h2 style={{ margin: '4px 0 0', fontSize: 28 }}>Welcome back</h2>
           </div>
-          <div className="field">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => {
-                setError(null);
-                setPassword(e.target.value);
-              }}
-            />
-          </div>
-          {error ? <div className="error">{error}</div> : null}
-          <button className="btn btn-primary" type="submit" disabled={busy}>
-            {busy ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
-        <p className="muted">
-          Founder login: <strong>saqlain@gmail.com</strong> / <strong>123123</strong>
-        </p>
-      </div>
+          <p className="muted">Use your operator account. Live rows come from the patient and nurse apps.</p>
+          <form className="stack" onSubmit={(e) => void onSubmit(e)}>
+            <div className="field">
+              <label htmlFor="email">Email</label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="username"
+                value={email}
+                onChange={(e) => {
+                  setError(null);
+                  setEmail(e.target.value);
+                }}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="password">Password</label>
+              <input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => {
+                  setError(null);
+                  setPassword(e.target.value);
+                }}
+              />
+            </div>
+            {error ? <div className="error">{error}</div> : null}
+            <button className="btn btn-primary" type="submit" disabled={busy}>
+              {busy ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
+          <p className="muted">
+            Founder login: <strong>saqlain@gmail.com</strong> / <strong>123123</strong>
+          </p>
+        </div>
+      </section>
     </div>
   );
 }
