@@ -40,6 +40,27 @@ export type Patient = {
   city: string;
 };
 
+export type ReviewDoc = {
+  docType: 'id_front' | 'id_back' | 'nurse_license' | string;
+  label: string;
+  path: string;
+  signedUrl: string | null;
+};
+
+export type IdReview = {
+  id: string;
+  role: 'patient' | 'nurse';
+  name: string;
+  phone: string;
+  email: string;
+  dob: string | null;
+  cnic: string | null;
+  address: string | null;
+  specialty: string | null;
+  license: string | null;
+  docs: ReviewDoc[];
+};
+
 export type VisitRequest = {
   id: string;
   code: string;
