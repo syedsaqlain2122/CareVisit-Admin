@@ -79,6 +79,7 @@ function mapNurse(row: Record<string, unknown>): Nurse {
     email: (row.email as string | null) || '—',
     license: np?.license_number || '—',
     accepting: np?.is_accepting_jobs ?? true,
+    suspended: row.account_status === 'suspended',
   };
 }
 
@@ -164,6 +165,7 @@ type StoreApi = LiveState & {
   ) => Promise<string | null>;
   setOrderStatus: (id: string, status: OrderStatus) => Promise<string | null>;
   toggleNurseAccepting: (id: string) => Promise<string | null>;
+  setNurseSuspended: (id: string, suspended: boolean) => Promise<string | null>;
 };
 
 const StoreContext = createContext<StoreApi | null>(null);
@@ -248,7 +250,7 @@ async function fetchLive(): Promise<LiveState> {
     supabase
       .from('profiles')
       .select(
-        'id, full_name, phone, email, created_at, nurse_profiles (specialty, license_number, is_accepting_jobs, credentials_label)',
+        'id, full_name, phone, email, created_at, account_status, nurse_profiles (specialty, license_number, is_accepting_jobs, credentials_label)',
       )
       .eq('role', 'nurse')
       .order('full_name'),
@@ -428,6 +430,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return null;
       },
       assignVisit: async (id, nurseId, windowStart, windowEnd) => {
+        const nurse = data.nurses.find((n) => n.id === nurseId);
+        if (nurse?.suspended) return 'This nurse is suspended and cannot be assigned jobs.';
         const { error: updateError } = await supabase
           .from('visit_requests')
           .update({
@@ -476,10 +480,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       toggleNurseAccepting: async (id) => {
         const nurse = data.nurses.find((n) => n.id === id);
+        if (nurse?.suspended) return 'Reactivate this nurse before changing duty status.';
         const { error: updateError } = await supabase
           .from('nurse_profiles')
           .update({ is_accepting_jobs: !(nurse?.accepting ?? true) })
           .eq('profile_id', id);
+        if (updateError) return updateError.message;
+        await refresh();
+        return null;
+      },
+      setNurseSuspended: async (id, suspended) => {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ account_status: suspended ? 'suspended' : 'active' })
+          .eq('id', id)
+          .eq('role', 'nurse');
         if (updateError) return updateError.message;
         await refresh();
         return null;

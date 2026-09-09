@@ -24,7 +24,10 @@ export function RequestsPage() {
   }, [visits]);
 
   useEffect(() => {
-    setNurseId((prev) => prev || nurses.find((n) => n.accepting)?.id || nurses[0]?.id || '');
+    setNurseId((prev) => {
+      if (prev && nurses.some((n) => n.id === prev && !n.suspended)) return prev;
+      return nurses.find((n) => !n.suspended && n.accepting)?.id || nurses.find((n) => !n.suspended)?.id || '';
+    });
   }, [nurses]);
 
   const rows = useMemo(
@@ -133,8 +136,9 @@ export function RequestsPage() {
                   <select value={nurseId} onChange={(e) => setNurseId(e.target.value)}>
                     {nurses.length === 0 ? <option value="">No nurses yet</option> : null}
                     {nurses.map((n) => (
-                      <option key={n.id} value={n.id} disabled={!n.accepting}>
-                        {n.name} {n.accepting ? '' : '(off)'}
+                      <option key={n.id} value={n.id} disabled={n.suspended || !n.accepting}>
+                        {n.name}
+                        {n.suspended ? ' (suspended)' : n.accepting ? '' : ' (off)'}
                       </option>
                     ))}
                   </select>

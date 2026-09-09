@@ -28,6 +28,8 @@ export type Nurse = {
   email: string;
   license: string;
   accepting: boolean;
+  /** profiles.account_status — not the off-duty toggle */
+  suspended: boolean;
 };
 
 export type Patient = {

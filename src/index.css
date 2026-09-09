@@ -507,6 +507,15 @@ tbody tr:last-child td { border-bottom: 0; }
   font-size: 13px;
   font-weight: 600;
 }
+.banner-error {
+  padding: 12px 14px;
+  border-radius: 14px;
+  margin-bottom: 16px;
+  background: #fdecec;
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+}
 
 .bar-row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; }
 .bar-track {

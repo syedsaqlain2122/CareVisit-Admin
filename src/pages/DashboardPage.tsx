@@ -89,7 +89,9 @@ export function DashboardPage() {
               {nurses.map((n) => (
                 <div key={n.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 12px', borderBottom: '1px solid var(--border)' }}>
                   <PersonCell name={n.name} meta={n.specialty} />
-                  <span className={`chip ${n.accepting ? 'approved' : 'cancelled'}`}>{n.accepting ? 'Accepting' : 'Off'}</span>
+                  <span className={`chip ${n.suspended ? 'cancelled' : n.accepting ? 'approved' : 'cancelled'}`}>
+                    {n.suspended ? 'Suspended' : n.accepting ? 'Accepting' : 'Off'}
+                  </span>
                 </div>
               ))}
             </div>
