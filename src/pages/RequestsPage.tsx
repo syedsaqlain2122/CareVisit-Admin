@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { EmptyState, PersonCell } from '@/components/ui';
+import { paths } from '@/lib/paths';
 import { money, nurseName, useStore } from '@/lib/store';
 import {
   chipClass,
@@ -13,8 +14,10 @@ import {
 
 export function RequestsPage() {
   const { visits, nurses, assignVisit, setVisitStatus, cancelVisit } = useStore();
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const focusId = params.get('visit');
+  const patientFocus = params.get('patient');
   const [filter, setFilter] = useState<'all' | VisitStatus>('all');
   const [selected, setSelected] = useState<VisitRequest | null>(null);
   const [nurseId, setNurseId] = useState('');
@@ -31,15 +34,17 @@ export function RequestsPage() {
   useEffect(() => {
     setSelected((prev) => {
       const fromQuery = focusId ? visits.find((v) => v.id === focusId) : null;
+      const fromPatient = patientFocus ? visits.find((v) => v.patientId === patientFocus) : null;
       return (
         fromQuery ??
+        fromPatient ??
         (prev ? visits.find((v) => v.id === prev.id) : null) ??
         visits.find((v) => isQueuedVisit(v.status)) ??
         visits[0] ??
         null
       );
     });
-  }, [visits, focusId]);
+  }, [visits, focusId, patientFocus]);
 
   useEffect(() => {
     setNurseId((prev) => {
@@ -121,18 +126,12 @@ export function RequestsPage() {
                 {rows.map((v) => (
                   <tr
                     key={v.id}
-                    className={selected?.id === v.id ? 'is-selected' : undefined}
-                    onClick={() => {
-                      setSelected(v);
-                      if (v.nurseId) setNurseId(v.nurseId);
-                      if (v.windowStart) setStart(v.windowStart);
-                      if (v.windowEnd) setEnd(v.windowEnd);
-                    }}
-                    style={{ cursor: 'pointer' }}
+                    className={selected?.id === v.id ? 'is-selected clickable' : 'clickable'}
+                    onClick={() => navigate(paths.visit(v.id))}
                   >
                     <td className="mono">{v.code}</td>
                     <td>
-                      <PersonCell name={v.patientName} meta={v.service} />
+                      <PersonCell name={v.patientName} meta={v.service} to={paths.patient(v.patientId)} />
                     </td>
                     <td>{v.preferredDate}</td>
                     <td>
@@ -150,7 +149,9 @@ export function RequestsPage() {
               <div>
                 <div className="panel-kicker">Assign staff</div>
                 <h3 style={{ margin: '6px 0 0', fontSize: 22 }}>
-                  {selected.patientName}
+                  <Link to={paths.patient(selected.patientId)} className="record-link">
+                    {selected.patientName}
+                  </Link>
                 </h3>
                 <p className="muted" style={{ marginTop: 6 }}>
                   {selected.service} · {selected.address}
@@ -241,7 +242,16 @@ export function RequestsPage() {
                 </>
               )}
               {message ? <div className="error">{message}</div> : null}
-              <p className="muted">Currently: {nurseName(nurses, selected.nurseId)}</p>
+              <p className="muted">
+                Currently:{' '}
+                {selected.nurseId ? (
+                  <Link to={paths.nurse(selected.nurseId)} className="record-link">
+                    {nurseName(nurses, selected.nurseId)}
+                  </Link>
+                ) : (
+                  'unassigned'
+                )}
+              </p>
             </>
           ) : (
             <EmptyState title="Select a request" body="Choose a visit on the left to assign a nurse." />

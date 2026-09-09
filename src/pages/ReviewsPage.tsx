@@ -1,5 +1,6 @@
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { EmptyState, PersonCell } from '@/components/ui';
+import { paths } from '@/lib/paths';
 import { useStore } from '@/lib/store';
 import { ratingChip } from '@/lib/types';
 
@@ -15,6 +16,7 @@ function whenLabel(iso: string) {
 }
 
 export function ReviewsPage() {
+  const navigate = useNavigate();
   const { nurseReviews } = useStore();
 
   return (
@@ -25,7 +27,7 @@ export function ReviewsPage() {
           <h2>Reviews</h2>
           <p>
             Patient ratings of nurses after a completed visit. Lowest scores first so weak care is easy to spot. Open a
-            visit to see the booking.
+            row for the visit, or the nurse name for their roster card.
           </p>
         </div>
       </div>
@@ -45,9 +47,13 @@ export function ReviewsPage() {
               </thead>
               <tbody>
                 {nurseReviews.map((r) => (
-                  <tr key={r.id}>
+                  <tr key={r.id} className="clickable" onClick={() => navigate(paths.visit(r.visitId))}>
                     <td>
-                      <PersonCell name={r.nurseName} meta={whenLabel(r.createdAt) || undefined} />
+                      <PersonCell
+                        name={r.nurseName}
+                        meta={whenLabel(r.createdAt) || undefined}
+                        to={r.nurseId ? paths.nurse(r.nurseId) : undefined}
+                      />
                     </td>
                     <td>
                       <span className={`chip ${ratingChip(r.rating)}`} title={`${r.rating} of 5`}>
@@ -56,9 +62,7 @@ export function ReviewsPage() {
                     </td>
                     <td>{r.comment?.trim() || <span className="muted">No comment</span>}</td>
                     <td>
-                      <Link to={`/requests?visit=${r.visitId}`} className="mono">
-                        {r.visitCode}
-                      </Link>
+                      <span className="mono">{r.visitCode}</span>
                       <div className="muted">{r.visitService}</div>
                     </td>
                   </tr>

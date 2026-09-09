@@ -135,6 +135,7 @@ function mapOrder(row: Record<string, unknown>, rxUrls: Map<string, string | nul
   return {
     id: String(row.id),
     code: String(row.public_code ?? row.id).slice(0, 12),
+    patientId: String(row.patient_id ?? ''),
     patientName: patient?.full_name || 'Patient',
     patientPhone: patient?.phone?.trim() || '—',
     items: labels.join(', ') || '—',
@@ -433,6 +434,7 @@ function mapNurseReview(row: Record<string, unknown>): NurseReview {
   const rating = Math.min(5, Math.max(1, Math.round(Number(row.rating ?? 1))));
   return {
     id: String(row.id),
+    nurseId: String(row.nurse_id ?? ''),
     nurseName: nurse?.full_name?.trim() || 'Nurse',
     rating,
     comment: ((row.comment as string | null) ?? '').trim() || null,
@@ -476,7 +478,7 @@ async function fetchLive(): Promise<LiveState> {
       .select(
         `
         id, public_code, status, subtotal_pkr, tax_pkr, total_pkr, created_at,
-        cancellation_reason, cancelled_by, prescription_path,
+        cancellation_reason, cancelled_by, prescription_path, patient_id,
         patient:profiles!orders_patient_id_fkey (full_name, phone),
         delivery:addresses!orders_delivery_address_id_fkey (label, line, area_label, notes),
         order_items (qty, unit_price_pkr, medicines (name))
@@ -522,7 +524,7 @@ async function fetchLive(): Promise<LiveState> {
       .from('reviews')
       .select(
         `
-        id, rating, comment, created_at, visit_request_id,
+        id, rating, comment, created_at, visit_request_id, nurse_id,
         nurse:profiles!reviews_nurse_id_fkey (full_name),
         visit:visit_requests!reviews_visit_request_id_fkey (
           public_code,

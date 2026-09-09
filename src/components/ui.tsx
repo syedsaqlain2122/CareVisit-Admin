@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 
 type AvatarTone = 'primary' | 'care' | 'deep' | 'warm';
 
@@ -42,8 +43,8 @@ export function Avatar({
   );
 }
 
-export function PersonCell({ name, meta }: { name: string; meta?: string }) {
-  return (
+export function PersonCell({ name, meta, to }: { name: string; meta?: string; to?: string }) {
+  const body = (
     <div className="person">
       <Avatar name={name} />
       <div className="person-copy">
@@ -51,6 +52,12 @@ export function PersonCell({ name, meta }: { name: string; meta?: string }) {
         {meta ? <div className="muted">{meta}</div> : null}
       </div>
     </div>
+  );
+  if (!to) return body;
+  return (
+    <Link to={to} className="record-link" onClick={(e) => e.stopPropagation()}>
+      {body}
+    </Link>
   );
 }
 
@@ -96,18 +103,28 @@ export function KpiCard({
   value,
   hint,
   tone = 'primary',
+  to,
 }: {
   label: string;
   value: string | number;
   hint?: string;
   tone?: AvatarTone;
+  to?: string;
 }) {
-  return (
-    <div className={`card kpi kpi-${tone}`}>
+  const body = (
+    <>
       <div className="label">{label}</div>
       <div className="value">{value}</div>
       {hint ? <div className="kpi-hint">{hint}</div> : null}
-    </div>
+    </>
+  );
+  if (!to) {
+    return <div className={`card kpi kpi-${tone}`}>{body}</div>;
+  }
+  return (
+    <Link to={to} className={`card kpi kpi-${tone} kpi-link`}>
+      {body}
+    </Link>
   );
 }
 

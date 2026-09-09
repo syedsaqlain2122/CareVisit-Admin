@@ -1,8 +1,11 @@
+import { Link, useNavigate } from 'react-router-dom';
 import { EmptyState, KpiCard, PersonCell } from '@/components/ui';
+import { paths } from '@/lib/paths';
 import { money, useStore } from '@/lib/store';
 import { chipClass } from '@/lib/types';
 
 export function ReportsPage() {
+  const navigate = useNavigate();
   const { visits, patients, orders, nurses } = useStore();
   const completed = visits.filter((v) => v.status === 'completed');
   const cancelledVisits = visits.filter((v) => v.status === 'cancelled');
@@ -28,10 +31,10 @@ export function ReportsPage() {
         </div>
       </div>
       <div className="grid-4" style={{ marginBottom: 16 }}>
-        <KpiCard label="Completed visits" value={completed.length} tone="care" />
-        <KpiCard label="Cancelled visits" value={cancelledVisits.length} tone="warm" />
-        <KpiCard label="Cancelled orders" value={cancelledOrders.length} tone="warm" />
-        <KpiCard label="Verified patients" value={approved} tone="primary" />
+        <KpiCard label="Completed visits" value={completed.length} tone="care" to="/requests" />
+        <KpiCard label="Cancelled visits" value={cancelledVisits.length} tone="warm" to="/requests" />
+        <KpiCard label="Cancelled orders" value={cancelledOrders.length} tone="warm" to="/pharmacy" />
+        <KpiCard label="Verified patients" value={approved} tone="primary" to="/patients" />
       </div>
       <div className="grid-2">
         <div className="card">
@@ -61,6 +64,8 @@ export function ReportsPage() {
           </div>
           <p className="muted">
             {orders.filter((o) => o.status !== 'cancelled').length} active orders · {nurses.length} nurses rostered
+            {' · '}
+            <Link to="/pharmacy">Open pharmacy</Link>
           </p>
         </div>
       </div>
@@ -81,10 +86,10 @@ export function ReportsPage() {
               </thead>
               <tbody>
                 {cancelledVisits.map((v) => (
-                  <tr key={v.id}>
+                  <tr key={v.id} className="clickable" onClick={() => navigate(paths.visit(v.id))}>
                     <td className="mono">{v.code}</td>
                     <td>
-                      <PersonCell name={v.patientName} meta={v.service} />
+                      <PersonCell name={v.patientName} meta={v.service} to={paths.patient(v.patientId)} />
                     </td>
                     <td>
                       <span className={`chip ${chipClass('cancelled')}`}>{v.cancelledBy ?? 'cancelled'}</span>
@@ -112,10 +117,10 @@ export function ReportsPage() {
               </thead>
               <tbody>
                 {cancelledOrders.map((o) => (
-                  <tr key={o.id}>
+                  <tr key={o.id} className="clickable" onClick={() => navigate(paths.order(o.id))}>
                     <td className="mono">{o.code}</td>
                     <td>
-                      <PersonCell name={o.patientName} />
+                      <PersonCell name={o.patientName} to={o.patientId ? paths.patient(o.patientId) : undefined} />
                     </td>
                     <td>
                       <span className={`chip ${chipClass('cancelled')}`}>{o.cancelledBy ?? 'cancelled'}</span>

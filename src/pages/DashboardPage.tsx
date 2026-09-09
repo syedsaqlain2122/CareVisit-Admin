@@ -1,5 +1,6 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { CardHead, EmptyState, KpiCard, PersonCell } from '@/components/ui';
+import { paths } from '@/lib/paths';
 import { money, nurseName, useStore } from '@/lib/store';
 import { chipClass, isQueuedVisit } from '@/lib/types';
 
@@ -11,6 +12,7 @@ function greeting() {
 }
 
 export function DashboardPage() {
+  const navigate = useNavigate();
   const { visits, orders, nurses, currentAdmin, idReviews, insuranceReviews } = useStore();
   const pending = visits.filter((v) => isQueuedVisit(v.status)).length;
   const live = visits.filter((v) => ['assigned', 'on_the_way', 'arrived', 'in_progress'].includes(v.status)).length;
@@ -37,13 +39,14 @@ export function DashboardPage() {
         </div>
       </div>
       <div className="grid-4" style={{ marginBottom: 18 }}>
-        <KpiCard label="Pending requests" value={pending} hint="Open + in review" tone="primary" />
-        <KpiCard label="Live visits" value={live} hint="Assigned through in progress" tone="care" />
+        <KpiCard label="Pending requests" value={pending} hint="Open + in review" tone="primary" to="/requests" />
+        <KpiCard label="Live visits" value={live} hint="Assigned through in progress" tone="care" to="/requests" />
         <KpiCard
           label="IDs to review"
           value={review}
           hint={insurance > 0 ? `${insurance} insurance waiting` : 'Patients + nurses under review'}
           tone="warm"
+          to="/verification"
         />
         <KpiCard
           label="COD outstanding"
@@ -54,6 +57,7 @@ export function DashboardPage() {
           )}
           hint="Pharmacy not yet collected"
           tone="deep"
+          to="/pharmacy"
         />
       </div>
       <div className="grid-2">
@@ -74,10 +78,14 @@ export function DashboardPage() {
                 </thead>
                 <tbody>
                   {visits.slice(0, 5).map((v) => (
-                    <tr key={v.id}>
+                    <tr
+                      key={v.id}
+                      className="clickable"
+                      onClick={() => navigate(paths.visit(v.id))}
+                    >
                       <td className="mono">{v.code}</td>
                       <td>
-                        <PersonCell name={v.patientName} meta={v.patientPhone} />
+                        <PersonCell name={v.patientName} meta={v.patientPhone} to={paths.patient(v.patientId)} />
                       </td>
                       <td>{v.service}</td>
                       <td>
@@ -97,12 +105,17 @@ export function DashboardPage() {
           ) : (
             <div style={{ padding: '4px 8px 12px' }}>
               {nurses.map((n) => (
-                <div key={n.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 12px', borderBottom: '1px solid var(--border)' }}>
+                <button
+                  type="button"
+                  key={n.id}
+                  className="shift-row"
+                  onClick={() => navigate(paths.nurse(n.id))}
+                >
                   <PersonCell name={n.name} meta={n.specialty} />
                   <span className={`chip ${n.suspended ? 'cancelled' : n.accepting ? 'approved' : 'cancelled'}`}>
                     {n.suspended ? 'Suspended' : n.accepting ? 'Accepting' : 'Off'}
                   </span>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -125,11 +138,27 @@ export function DashboardPage() {
               </thead>
               <tbody>
                 {assigned.map((v) => (
-                  <tr key={v.id}>
+                  <tr
+                    key={v.id}
+                    className="clickable"
+                    onClick={() => navigate(paths.visit(v.id))}
+                  >
                     <td>
-                      <PersonCell name={v.patientName} meta={v.service} />
+                      <PersonCell name={v.patientName} meta={v.service} to={paths.patient(v.patientId)} />
                     </td>
-                    <td>{nurseName(nurses, v.nurseId)}</td>
+                    <td>
+                      {v.nurseId ? (
+                        <Link
+                          to={paths.nurse(v.nurseId)}
+                          className="record-link"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {nurseName(nurses, v.nurseId)}
+                        </Link>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                     <td>{v.windowStart ? `${v.windowStart}–${v.windowEnd}` : '—'}</td>
                     <td className="mono">{money(v.feePkr)}</td>
                   </tr>

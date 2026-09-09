@@ -127,6 +127,7 @@ export type InsuranceReview = {
 
 export type NurseReview = {
   id: string;
+  nurseId: string;
   nurseName: string;
   rating: number;
   comment: string | null;
@@ -161,6 +162,7 @@ export type VisitRequest = {
 export type PharmacyOrder = {
   id: string;
   code: string;
+  patientId: string;
   patientName: string;
   patientPhone: string;
   items: string;

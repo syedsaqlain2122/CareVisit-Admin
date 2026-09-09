@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { EmptyState, PersonCell } from '@/components/ui';
+import { paths } from '@/lib/paths';
 import { money, useStore } from '@/lib/store';
 import {
   chipClass,
@@ -64,6 +65,7 @@ export function PharmacyPage() {
 
 function OrdersPanel() {
   const { orders, setOrderStatus, cancelOrder } = useStore();
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const focusId = params.get('order');
   const [selected, setSelected] = useState<PharmacyOrder | null>(null);
@@ -116,13 +118,12 @@ function OrdersPanel() {
               {orders.map((o) => (
                 <tr
                   key={o.id}
-                  className={selected?.id === o.id ? 'is-selected' : undefined}
-                  onClick={() => setSelected(o)}
-                  style={{ cursor: 'pointer' }}
+                  className={selected?.id === o.id ? 'is-selected clickable' : 'clickable'}
+                  onClick={() => navigate(paths.order(o.id))}
                 >
                   <td className="mono">{o.code}</td>
                   <td>
-                    <PersonCell name={o.patientName} />
+                    <PersonCell name={o.patientName} to={o.patientId ? paths.patient(o.patientId) : undefined} />
                   </td>
                   <td className="mono">{money(o.totalPkr)}</td>
                   <td>
@@ -141,7 +142,13 @@ function OrdersPanel() {
               <div className="panel-kicker">Order detail</div>
               <h3 style={{ margin: '6px 0 0', fontSize: 22 }}>{selected.code}</h3>
               <p className="muted" style={{ marginTop: 6 }}>
-                {selected.patientName}
+                {selected.patientId ? (
+                  <Link to={paths.patient(selected.patientId)} className="record-link">
+                    {selected.patientName}
+                  </Link>
+                ) : (
+                  selected.patientName
+                )}
               </p>
             </div>
             <dl className="review-meta">
