@@ -174,6 +174,7 @@ function mapMedicine(row: Record<string, unknown>): CatalogMedicine {
     category: isMedicineCategory(category) ? category : 'pain',
     rxRequired: Boolean(row.rx_required),
     available: row.available !== false,
+    stockQty: Math.max(0, Number(row.stock_qty ?? 0)),
     description: text,
     imageUrl: ((row.image_url as string | null) ?? '').trim() || null,
   };
@@ -380,7 +381,7 @@ async function fetchLive(): Promise<LiveState> {
       .order('created_at', { ascending: false }),
     supabase
       .from('medicines')
-      .select('id, name, subtitle, price_pkr, category, rx_required, available, description, image_url')
+      .select('id, name, subtitle, price_pkr, category, rx_required, available, stock_qty, description, image_url')
       .order('name'),
     supabase
       .from('profiles')
@@ -627,6 +628,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const price = Number(input.pricePkr);
         if (!Number.isFinite(price) || price < 0) return 'Enter a valid price.';
 
+        const stock = Math.round(Number(input.stockQty));
+        if (!Number.isFinite(stock) || stock < 0) return 'Enter a stock count of 0 or more.';
+
         let id = input.id?.trim() || slugifyMedicineId(name);
         if (!input.id) {
           const taken = data.medicines.some((m) => m.id === id);
@@ -649,7 +653,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           price_pkr: price,
           category: input.category,
           rx_required: input.rxRequired,
-          available: input.available,
+          stock_qty: stock,
           description,
         };
         if (imageUrl) {

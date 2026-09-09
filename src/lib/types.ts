@@ -31,6 +31,7 @@ export type CatalogMedicine = {
   category: MedicineCategory;
   rxRequired: boolean;
   available: boolean;
+  stockQty: number;
   description: string;
   imageUrl: string | null;
 };
@@ -49,7 +50,7 @@ export type MedicineInput = {
   category: MedicineCategory;
   description: string;
   rxRequired: boolean;
-  available: boolean;
+  stockQty: number;
   imageFile?: File | null;
 };
 

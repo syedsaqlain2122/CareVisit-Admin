@@ -18,7 +18,7 @@ const EMPTY_FORM = {
   category: 'pain' as MedicineCategory,
   description: '',
   rxRequired: false,
-  available: true,
+  stock: '',
 };
 
 export function PharmacyPage() {
@@ -33,7 +33,7 @@ export function PharmacyPage() {
           <p>
             {tab === 'orders'
               ? 'Medicine delivery from the patient app. Cash on delivery to courier on arrival.'
-              : 'Add and edit catalog items. Changes show up in the patient app immediately.'}
+              : 'Set how many units you have. Patients only see In stock or Out of stock — never the count.'}
           </p>
         </div>
       </div>
@@ -297,7 +297,7 @@ function CatalogPanel() {
       category: m.category,
       description: m.description,
       rxRequired: m.rxRequired,
-      available: m.available,
+      stock: String(m.stockQty),
     });
     setImageFile(null);
     setPreview(m.imageUrl);
@@ -325,7 +325,7 @@ function CatalogPanel() {
       category: form.category,
       description: form.description,
       rxRequired: form.rxRequired,
-      available: form.available,
+      stockQty: Number(form.stock),
       imageFile,
     });
     setBusy(false);
@@ -378,8 +378,8 @@ function CatalogPanel() {
                   <td>{MEDICINE_CATEGORIES.find((c) => c.key === m.category)?.label ?? m.category}</td>
                   <td className="mono">{money(m.pricePkr)}</td>
                   <td>
-                    <span className={`chip ${m.available ? 'approved' : 'cancelled'}`}>
-                      {m.available ? 'In stock' : 'Out of stock'}
+                    <span className={`chip ${m.stockQty > 0 ? 'approved' : 'cancelled'}`}>
+                      {m.stockQty > 0 ? `${m.stockQty} in stock` : 'Out of stock'}
                     </span>
                   </td>
                 </tr>
@@ -460,14 +460,21 @@ function CatalogPanel() {
             />
             Prescription required
           </label>
-          <label className="check-row">
+          <div className="field">
+            <label htmlFor="med-stock">Units in stock</label>
             <input
-              type="checkbox"
-              checked={form.available}
-              onChange={(e) => setForm((f) => ({ ...f, available: e.target.checked }))}
+              id="med-stock"
+              type="number"
+              min={0}
+              step="1"
+              value={form.stock}
+              onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))}
+              required
             />
-            In stock
-          </label>
+            <p className="muted" style={{ margin: 0 }}>
+              When this hits 0, the app shows Out of stock. Patients never see the number.
+            </p>
+          </div>
           <div className="field">
             <label htmlFor="med-image">Product image</label>
             <input
