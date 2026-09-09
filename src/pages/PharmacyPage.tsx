@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { EmptyState, PersonCell } from '@/components/ui';
 import { money, useStore } from '@/lib/store';
 import {
@@ -22,7 +23,13 @@ const EMPTY_FORM = {
 };
 
 export function PharmacyPage() {
+  const [params] = useSearchParams();
+  const focusOrder = params.get('order');
   const [tab, setTab] = useState<Tab>('orders');
+
+  useEffect(() => {
+    if (focusOrder) setTab('orders');
+  }, [focusOrder]);
 
   return (
     <>
@@ -52,14 +59,19 @@ export function PharmacyPage() {
 
 function OrdersPanel() {
   const { orders, setOrderStatus, cancelOrder } = useStore();
+  const [params] = useSearchParams();
+  const focusId = params.get('order');
   const [selected, setSelected] = useState<PharmacyOrder | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
-    setSelected((prev) => (prev ? orders.find((o) => o.id === prev.id) : null) ?? orders[0] ?? null);
-  }, [orders]);
+    setSelected((prev) => {
+      const fromQuery = focusId ? orders.find((o) => o.id === focusId) : null;
+      return fromQuery ?? (prev ? orders.find((o) => o.id === prev.id) : null) ?? orders[0] ?? null;
+    });
+  }, [orders, focusId]);
 
   useEffect(() => {
     setCancelReason('');

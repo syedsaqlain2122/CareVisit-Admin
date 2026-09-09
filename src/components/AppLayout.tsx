@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Avatar, BrandMark } from '@/components/ui';
+import { OpsAlerts } from '@/components/OpsAlerts';
 import { useStore } from '@/lib/store';
 
 const NAV = [
@@ -131,7 +132,7 @@ function ChartIcon() {
 }
 
 export function AppLayout() {
-  const { currentAdmin, logout, loading, error, refresh } = useStore();
+  const { currentAdmin, logout, error, refresh } = useStore();
   const navigate = useNavigate();
 
   return (
@@ -182,10 +183,7 @@ export function AppLayout() {
       </aside>
       <main className="main">
         <div className="topbar">
-          <span className="live-pill">
-            <span className="live-dot" />
-            {loading ? 'Syncing live data' : 'Live from CareVisit'}
-          </span>
+          <OpsAlerts enabled={!!currentAdmin} onChange={() => void refresh()} />
         </div>
         {error ? (
           <div className="banner">

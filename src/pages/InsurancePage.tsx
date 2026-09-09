@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { EmptyState, PersonCell } from '@/components/ui';
 import { useStore } from '@/lib/store';
 import type { InsuranceReview } from '@/lib/types';
@@ -31,6 +32,7 @@ function blankDoc(docType: 'insurance_front' | 'insurance_back', label: string):
 
 function ReviewCard({
   item,
+  highlight,
   busy,
   reason,
   onReason,
@@ -38,6 +40,7 @@ function ReviewCard({
   onReject,
 }: {
   item: InsuranceReview;
+  highlight: boolean;
   busy: boolean;
   reason: string;
   onReason: (value: string) => void;
@@ -45,7 +48,7 @@ function ReviewCard({
   onReject: () => void;
 }) {
   return (
-    <article className="card stack review-card">
+    <article className={`card stack review-card${highlight ? ' is-selected' : ''}`} id={`ins-review-${item.id}`}>
       <div className="staff-top">
         <PersonCell name={item.name} meta="Patient" />
       </div>
@@ -99,9 +102,16 @@ function ReviewCard({
 
 export function InsurancePage() {
   const { insuranceReviews, setInsuranceStatus } = useStore();
+  const [params] = useSearchParams();
+  const focusId = params.get('policy');
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!focusId) return;
+    document.getElementById(`ins-review-${focusId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [focusId, insuranceReviews]);
 
   const decide = async (id: string, status: 'approved' | 'rejected') => {
     setBusyId(id);
@@ -137,6 +147,7 @@ export function InsurancePage() {
             <ReviewCard
               key={item.id}
               item={item}
+              highlight={item.id === focusId}
               busy={busyId === item.id}
               reason={reasons[item.id] ?? ''}
               onReason={(value) => setReasons((prev) => ({ ...prev, [item.id]: value }))}

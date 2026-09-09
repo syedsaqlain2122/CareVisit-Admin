@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { EmptyState, PersonCell } from '@/components/ui';
 import { useStore } from '@/lib/store';
 import type { IdReview } from '@/lib/types';
@@ -29,6 +30,7 @@ function DocPreview({ doc }: { doc: IdReview['docs'][number] }) {
 
 function ReviewCard({
   item,
+  highlight,
   busy,
   reason,
   onReason,
@@ -36,6 +38,7 @@ function ReviewCard({
   onReject,
 }: {
   item: IdReview;
+  highlight: boolean;
   busy: boolean;
   reason: string;
   onReason: (value: string) => void;
@@ -43,7 +46,7 @@ function ReviewCard({
   onReject: () => void;
 }) {
   return (
-    <article className="card stack review-card">
+    <article className={`card stack review-card${highlight ? ' is-selected' : ''}`} id={`id-review-${item.id}`}>
       <div className="staff-top">
         <PersonCell name={item.name} meta={item.role === 'nurse' ? 'Nurse' : 'Patient'} />
       </div>
@@ -131,6 +134,8 @@ function ReviewCard({
 
 export function VerificationPage() {
   const { idReviews, setVerification } = useStore();
+  const [params] = useSearchParams();
+  const focusId = params.get('profile');
   const [tab, setTab] = useState<'patient' | 'nurse'>('patient');
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -139,6 +144,16 @@ export function VerificationPage() {
   const patients = useMemo(() => idReviews.filter((r) => r.role === 'patient'), [idReviews]);
   const nurses = useMemo(() => idReviews.filter((r) => r.role === 'nurse'), [idReviews]);
   const list = tab === 'patient' ? patients : nurses;
+
+  useEffect(() => {
+    const match = focusId ? idReviews.find((r) => r.id === focusId) : null;
+    if (match) setTab(match.role === 'nurse' ? 'nurse' : 'patient');
+  }, [focusId, idReviews]);
+
+  useEffect(() => {
+    if (!focusId) return;
+    document.getElementById(`id-review-${focusId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [focusId, list]);
 
   const decide = async (id: string, status: 'approved' | 'rejected') => {
     setBusyId(id);
@@ -182,6 +197,7 @@ export function VerificationPage() {
             <ReviewCard
               key={item.id}
               item={item}
+              highlight={item.id === focusId}
               busy={busyId === item.id}
               reason={reasons[item.id] ?? ''}
               onReason={(value) => setReasons((prev) => ({ ...prev, [item.id]: value }))}
