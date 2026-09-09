@@ -23,6 +23,11 @@ export const MEDICINE_CATEGORIES: { key: MedicineCategory; label: string }[] = [
   { key: 'first_aid', label: 'First aid' },
 ];
 
+export type HowToUseStep = {
+  title: string;
+  body: string;
+};
+
 export type CatalogMedicine = {
   id: string;
   name: string;
@@ -33,7 +38,10 @@ export type CatalogMedicine = {
   available: boolean;
   stockQty: number;
   description: string;
+  howToUse: HowToUseStep[];
+  safetyTags: string[];
   imageUrl: string | null;
+  active: boolean;
 };
 
 export type OrderLineItem = {
@@ -49,6 +57,8 @@ export type MedicineInput = {
   pricePkr: number;
   category: MedicineCategory;
   description: string;
+  howToUse: HowToUseStep[];
+  safetyTags: string[];
   rxRequired: boolean;
   stockQty: number;
   imageFile?: File | null;

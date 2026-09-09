@@ -6,11 +6,14 @@ import {
   chipClass,
   MEDICINE_CATEGORIES,
   type CatalogMedicine,
+  type HowToUseStep,
   type MedicineCategory,
   type PharmacyOrder,
 } from '@/lib/types';
 
 type Tab = 'orders' | 'catalog';
+
+const EMPTY_HOW_TO: HowToUseStep[] = [{ title: '', body: '' }];
 
 const EMPTY_FORM = {
   name: '',
@@ -18,6 +21,8 @@ const EMPTY_FORM = {
   price: '',
   category: 'pain' as MedicineCategory,
   description: '',
+  howToUse: EMPTY_HOW_TO,
+  safetyTags: '',
   rxRequired: false,
   stock: '',
 };
@@ -40,7 +45,7 @@ export function PharmacyPage() {
           <p>
             {tab === 'orders'
               ? 'Medicine delivery from the patient app. Cash on delivery to courier on arrival.'
-              : 'Set how many units you have. Patients only see In stock or Out of stock — never the count.'}
+              : 'Edit the catalog patients see in the app. Hide a product to soft-delete it — past orders keep the name.'}
           </p>
         </div>
       </div>
@@ -284,7 +289,7 @@ function OrdersPanel() {
 }
 
 function CatalogPanel() {
-  const { medicines, saveMedicine } = useStore();
+  const { medicines, saveMedicine, setMedicineActive } = useStore();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -308,6 +313,8 @@ function CatalogPanel() {
       price: String(m.pricePkr),
       category: m.category,
       description: m.description,
+      howToUse: m.howToUse.length > 0 ? m.howToUse : EMPTY_HOW_TO,
+      safetyTags: m.safetyTags.join(', '),
       rxRequired: m.rxRequired,
       stock: String(m.stockQty),
     });
@@ -319,7 +326,7 @@ function CatalogPanel() {
 
   const startNew = () => {
     setSelectedId(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, howToUse: [{ title: '', body: '' }] });
     setImageFile(null);
     setPreview(null);
     setMessage(null);
@@ -336,6 +343,8 @@ function CatalogPanel() {
       pricePkr: Number(form.price),
       category: form.category,
       description: form.description,
+      howToUse: form.howToUse,
+      safetyTags: form.safetyTags.split(',').map((tag) => tag.trim()).filter(Boolean),
       rxRequired: form.rxRequired,
       stockQty: Number(form.stock),
       imageFile,
@@ -348,7 +357,7 @@ function CatalogPanel() {
     }
     const added = selectedId ? 'Catalog item updated.' : 'Medicine added to the catalog.';
     if (!selectedId) {
-      setForm(EMPTY_FORM);
+      setForm({ ...EMPTY_FORM, howToUse: [{ title: '', body: '' }] });
       setImageFile(null);
       setPreview(null);
     } else {
@@ -356,6 +365,22 @@ function CatalogPanel() {
     }
     setOk(true);
     setMessage(added);
+  };
+
+  const selected = selectedId ? medicines.find((m) => m.id === selectedId) : null;
+
+  const onToggleActive = async () => {
+    if (!selectedId || !selected) return;
+    setBusy(true);
+    const err = await setMedicineActive(selectedId, !selected.active);
+    setBusy(false);
+    if (err) {
+      setOk(false);
+      setMessage(err);
+      return;
+    }
+    setOk(true);
+    setMessage(selected.active ? 'Hidden from the patient catalog.' : 'Restored to the patient catalog.');
   };
 
   return (
@@ -377,14 +402,19 @@ function CatalogPanel() {
               {medicines.map((m) => (
                 <tr
                   key={m.id}
-                  className={selectedId === m.id ? 'is-selected' : undefined}
+                  className={`${selectedId === m.id ? 'is-selected' : ''}${m.active ? '' : ' is-hidden'}`}
                   onClick={() => loadMedicine(m)}
                   style={{ cursor: 'pointer' }}
                 >
                   <td>
                     <div className="med-cell">
                       {m.imageUrl ? <img src={m.imageUrl} alt="" className="med-thumb" /> : <span className="med-thumb med-thumb-empty" />}
-                      <PersonCell name={m.name} meta={m.rxRequired ? 'Rx required' : m.subtitle || undefined} />
+                      <PersonCell
+                        name={m.name}
+                        meta={
+                          !m.active ? 'Hidden' : m.rxRequired ? 'Rx required' : m.subtitle || undefined
+                        }
+                      />
                     </div>
                   </td>
                   <td>{MEDICINE_CATEGORIES.find((c) => c.key === m.category)?.label ?? m.category}</td>
@@ -464,6 +494,71 @@ function CatalogPanel() {
               placeholder="Shown on the product page in the app"
             />
           </div>
+          <div className="field">
+            <label>How to use</label>
+            <p className="muted" style={{ margin: '0 0 8px' }}>
+              Steps on the product page — typically Dosage, Administration, Limits.
+            </p>
+            <div className="stack">
+              {form.howToUse.map((step, index) => (
+                <div className="how-step" key={index}>
+                  <input
+                    aria-label={`How to use title ${index + 1}`}
+                    placeholder="Title"
+                    value={step.title}
+                    onChange={(e) =>
+                      setForm((f) => {
+                        const howToUse = f.howToUse.map((s, i) => (i === index ? { ...s, title: e.target.value } : s));
+                        return { ...f, howToUse };
+                      })
+                    }
+                  />
+                  <textarea
+                    aria-label={`How to use body ${index + 1}`}
+                    rows={2}
+                    placeholder="Instructions"
+                    value={step.body}
+                    onChange={(e) =>
+                      setForm((f) => {
+                        const howToUse = f.howToUse.map((s, i) => (i === index ? { ...s, body: e.target.value } : s));
+                        return { ...f, howToUse };
+                      })
+                    }
+                  />
+                  {form.howToUse.length > 1 ? (
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      type="button"
+                      onClick={() =>
+                        setForm((f) => ({ ...f, howToUse: f.howToUse.filter((_, i) => i !== index) }))
+                      }
+                    >
+                      Remove step
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+              <button
+                className="btn btn-ghost btn-sm"
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, howToUse: [...f.howToUse, { title: '', body: '' }] }))}
+              >
+                Add step
+              </button>
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="med-safety">Safety tags</label>
+            <input
+              id="med-safety"
+              value={form.safetyTags}
+              onChange={(e) => setForm((f) => ({ ...f, safetyTags: e.target.value }))}
+              placeholder="Pregnancy Safe, Kids 12+"
+            />
+            <p className="muted" style={{ margin: 0 }}>
+              Comma-separated. Shown as chips under Safety check in the app.
+            </p>
+          </div>
           <label className="check-row">
             <input
               type="checkbox"
@@ -500,6 +595,11 @@ function CatalogPanel() {
           <button className="btn btn-primary" type="submit" disabled={busy}>
             {busy ? 'Saving…' : selectedId ? 'Save changes' : 'Add medicine'}
           </button>
+          {selected && selectedId ? (
+            <button className="btn btn-ghost" type="button" disabled={busy} onClick={() => void onToggleActive()}>
+              {selected.active ? 'Hide from catalog' : 'Restore to catalog'}
+            </button>
+          ) : null}
           {message ? <div className={ok ? 'ok' : 'error'}>{message}</div> : null}
         </form>
       </div>

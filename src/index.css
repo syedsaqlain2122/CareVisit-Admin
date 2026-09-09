@@ -601,6 +601,15 @@ tbody tr:last-child td { border-bottom: 0; }
   font-size: 14px;
   font-weight: 600;
 }
+.how-step {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+}
+tbody tr.is-hidden { opacity: 0.55; }
 .lines-table { width: 100%; font-size: 13px; }
 .lines-table th { font-size: 11px; color: var(--ink-500); }
 

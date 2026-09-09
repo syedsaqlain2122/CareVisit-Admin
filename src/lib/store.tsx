@@ -13,6 +13,7 @@ import {
   orderPayment,
   type AdminAccount,
   type CatalogMedicine,
+  type HowToUseStep,
   type IdReview,
   type InsuranceReview,
   type MedicineCategory,
@@ -160,6 +161,25 @@ function isMedicineCategory(value: string): value is MedicineCategory {
   return MEDICINE_CATEGORIES.some((c) => c.key === value);
 }
 
+function mapHowToUse(value: unknown): HowToUseStep[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+      const step = entry as { title?: unknown; body?: unknown };
+      const title = typeof step.title === 'string' ? step.title.trim() : '';
+      const body = typeof step.body === 'string' ? step.body.trim() : '';
+      if (!title && !body) return null;
+      return { title, body };
+    })
+    .filter((step): step is HowToUseStep => step !== null);
+}
+
+function mapSafetyTags(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((tag) => (typeof tag === 'string' ? tag.trim() : '')).filter(Boolean);
+}
+
 function mapMedicine(row: Record<string, unknown>): CatalogMedicine {
   const category = String(row.category ?? 'pain');
   const description = row.description;
@@ -178,7 +198,10 @@ function mapMedicine(row: Record<string, unknown>): CatalogMedicine {
     available: row.available !== false,
     stockQty: Math.max(0, Number(row.stock_qty ?? 0)),
     description: text,
+    howToUse: mapHowToUse(row.how_to_use),
+    safetyTags: mapSafetyTags(row.safety_tags),
     imageUrl: ((row.image_url as string | null) ?? '').trim() || null,
+    active: row.active !== false,
   };
 }
 
@@ -241,6 +264,7 @@ type StoreApi = LiveState & {
   setOrderStatus: (id: string, status: OrderStatus) => Promise<string | null>;
   cancelOrder: (id: string, reason: string) => Promise<string | null>;
   saveMedicine: (input: MedicineInput) => Promise<string | null>;
+  setMedicineActive: (id: string, active: boolean) => Promise<string | null>;
   toggleNurseAccepting: (id: string) => Promise<string | null>;
   setNurseSuspended: (id: string, suspended: boolean) => Promise<string | null>;
 };
@@ -461,7 +485,10 @@ async function fetchLive(): Promise<LiveState> {
       .order('created_at', { ascending: false }),
     supabase
       .from('medicines')
-      .select('id, name, subtitle, price_pkr, category, rx_required, available, stock_qty, description, image_url')
+      .select(
+        'id, name, subtitle, price_pkr, category, rx_required, available, stock_qty, description, how_to_use, safety_tags, image_url, active',
+      )
+      .order('active', { ascending: false })
       .order('name'),
     supabase
       .from('profiles')
@@ -802,6 +829,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
 
         const description = descriptionList(input.description);
+        const howToUse = input.howToUse
+          .map((step) => ({ title: step.title.trim(), body: step.body.trim() }))
+          .filter((step) => step.title || step.body);
+        const safetyTags = input.safetyTags.map((tag) => tag.trim()).filter(Boolean);
         const payload: Record<string, unknown> = {
           name,
           subtitle: input.subtitle.trim(),
@@ -810,6 +841,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           rx_required: input.rxRequired,
           stock_qty: stock,
           description,
+          how_to_use: howToUse,
+          safety_tags: safetyTags,
         };
         if (imageUrl) {
           payload.image_url = imageUrl;
@@ -820,6 +853,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ? await supabase.from('medicines').update(payload).eq('id', id)
           : await supabase.from('medicines').insert({ id, ...payload });
         if (writeError) return writeError.message;
+        await refresh();
+        return null;
+      },
+      setMedicineActive: async (id, active) => {
+        const { error: updateError } = await supabase.from('medicines').update({ active }).eq('id', id);
+        if (updateError) return updateError.message;
         await refresh();
         return null;
       },
