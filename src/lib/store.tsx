@@ -704,6 +704,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       assignVisit: async (id, nurseId, windowStart, windowEnd) => {
         const visit = data.visits.find((v) => v.id === id);
         if (visit?.status === 'cancelled') return 'This visit is cancelled.';
+        if (visit?.status === 'completed') return 'This visit is already completed.';
         const nurse = data.nurses.find((n) => n.id === nurseId);
         if (nurse?.suspended) return 'This nurse is suspended and cannot be assigned jobs.';
         const { error: updateError } = await supabase
@@ -722,6 +723,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (status === 'cancelled') {
           return 'Use Cancel with a reason to cancel this visit.';
         }
+        const visit = data.visits.find((v) => v.id === id);
+        if (visit?.status === 'cancelled') return 'This visit is cancelled.';
+        if (visit?.status === 'completed') return 'This visit is already completed.';
         const { error: updateError } = await supabase.from('visit_requests').update({ status }).eq('id', id);
         if (updateError) return updateError.message;
         await refresh();
@@ -734,7 +738,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           .from('visit_requests')
           .update({ status: 'cancelled', cancellation_reason: trimmed })
           .eq('id', id)
-          .neq('status', 'cancelled');
+          .neq('status', 'cancelled')
+          .neq('status', 'completed');
         if (updateError) return updateError.message;
         await refresh();
         return null;
@@ -788,6 +793,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (status === 'cancelled') {
           return 'Use Cancel with a reason to cancel this order.';
         }
+        const order = data.orders.find((o) => o.id === id);
+        if (order?.status === 'cancelled') return 'This order is cancelled.';
+        if (order?.status === 'delivered') return 'This order is already delivered.';
         const { error: updateError } = await supabase.from('orders').update({ status }).eq('id', id);
         if (updateError) return updateError.message;
         await refresh();

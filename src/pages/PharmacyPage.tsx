@@ -96,6 +96,8 @@ function OrdersPanel() {
 
   const cancelled = selected?.status === 'cancelled';
   const delivered = selected?.status === 'delivered';
+  const canDispatch = !!selected && (selected.status === 'placed' || selected.status === 'confirmed');
+  const canMarkDelivered = !!selected && !cancelled && !delivered;
   const canCancel = !!selected && !cancelled && !delivered;
   const rxIsPdf = (selected?.prescriptionPath ?? '').toLowerCase().endsWith('.pdf');
 
@@ -250,20 +252,24 @@ function OrdersPanel() {
             ) : (
               <>
                 <div className="row">
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    type="button"
-                    onClick={() => void setOrderStatus(selected.id, 'out_for_delivery')}
-                  >
-                    Dispatch
-                  </button>
-                  <button
-                    className="btn btn-care btn-sm"
-                    type="button"
-                    onClick={() => void setOrderStatus(selected.id, 'delivered')}
-                  >
-                    Delivered + COD
-                  </button>
+                  {canDispatch ? (
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      type="button"
+                      onClick={() => void setOrderStatus(selected.id, 'out_for_delivery')}
+                    >
+                      Dispatch
+                    </button>
+                  ) : null}
+                  {canMarkDelivered ? (
+                    <button
+                      className="btn btn-care btn-sm"
+                      type="button"
+                      onClick={() => void setOrderStatus(selected.id, 'delivered')}
+                    >
+                      Delivered + COD
+                    </button>
+                  ) : null}
                 </div>
                 <div className="field">
                   <label htmlFor="order-cancel-reason">Cancel on customer’s behalf</label>

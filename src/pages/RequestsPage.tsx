@@ -68,13 +68,13 @@ export function RequestsPage() {
 
   const onAssign = async (e: FormEvent) => {
     e.preventDefault();
-    if (!selected || !nurseId) return;
+    if (!selected || !nurseId || selected.status === 'completed' || selected.status === 'cancelled') return;
     const err = await assignVisit(selected.id, nurseId, start, end);
     setMessage(err);
   };
 
   const onCancel = async () => {
-    if (!selected || cancelling) return;
+    if (!selected || cancelling || selected.status === 'completed' || selected.status === 'cancelled') return;
     setCancelling(true);
     const err = await cancelVisit(selected.id, cancelReason);
     setCancelling(false);
@@ -83,6 +83,8 @@ export function RequestsPage() {
   };
 
   const cancelled = selected?.status === 'cancelled';
+  const completed = selected?.status === 'completed';
+  const closed = cancelled || completed;
 
   return (
     <>
@@ -147,7 +149,7 @@ export function RequestsPage() {
           {selected ? (
             <>
               <div>
-                <div className="panel-kicker">Assign staff</div>
+                <div className="panel-kicker">{closed ? 'Visit' : 'Assign staff'}</div>
                 <h3 style={{ margin: '6px 0 0', fontSize: 22 }}>
                   <Link to={paths.patient(selected.patientId)} className="record-link">
                     {selected.patientName}
@@ -176,6 +178,12 @@ export function RequestsPage() {
                     ? ' The assigned nurse was notified if one was already on the job.'
                     : ' The patient and any assigned nurse were notified.'}
                 </div>
+              ) : completed ? (
+                <p className="muted">
+                  Completed
+                  {selected.windowStart ? ` · ${selected.windowStart}–${selected.windowEnd}` : ''}.
+                  Assignment, status changes, and cancellation are closed.
+                </p>
               ) : (
                 <>
                   <form className="stack" onSubmit={(e) => void onAssign(e)}>
@@ -202,13 +210,13 @@ export function RequestsPage() {
                       </div>
                     </div>
                     <button className="btn btn-primary" type="submit" disabled={!nurseId}>
-                      Assign nurse
+                      {selected.nurseId ? 'Reassign nurse' : 'Assign nurse'}
                     </button>
                   </form>
                   <div className="field">
                     <label>Advance status</label>
                     <select
-                      value={selected.status === 'cancelled' ? 'open' : selected.status}
+                      value={selected.status}
                       onChange={(e) => {
                         const status = e.target.value as VisitStatus;
                         void setVisitStatus(selected.id, status);
