@@ -50,7 +50,7 @@ export function LoginPage() {
           <div className="login-pills">
             <span>Visit queue</span>
             <span>ID review</span>
-            <span>COD only</span>
+            <span>Insurance</span>
           </div>
         </div>
         <p className="muted" style={{ color: 'rgba(255,255,255,0.5)' }}>

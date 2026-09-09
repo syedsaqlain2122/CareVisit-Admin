@@ -11,10 +11,11 @@ function greeting() {
 }
 
 export function DashboardPage() {
-  const { visits, orders, nurses, currentAdmin, idReviews } = useStore();
+  const { visits, orders, nurses, currentAdmin, idReviews, insuranceReviews } = useStore();
   const pending = visits.filter((v) => isQueuedVisit(v.status)).length;
   const live = visits.filter((v) => ['assigned', 'on_the_way', 'arrived', 'in_progress'].includes(v.status)).length;
   const review = idReviews.length;
+  const insurance = insuranceReviews.length;
   const assigned = visits.filter((v) => v.nurseId);
   const firstName = currentAdmin?.name.split(' ')[0] ?? 'there';
 
@@ -38,7 +39,12 @@ export function DashboardPage() {
       <div className="grid-4" style={{ marginBottom: 18 }}>
         <KpiCard label="Pending requests" value={pending} hint="Open + in review" tone="primary" />
         <KpiCard label="Live visits" value={live} hint="Assigned through in progress" tone="care" />
-        <KpiCard label="IDs to review" value={review} hint="Patients + nurses under review" tone="warm" />
+        <KpiCard
+          label="IDs to review"
+          value={review}
+          hint={insurance > 0 ? `${insurance} insurance waiting` : 'Patients + nurses under review'}
+          tone="warm"
+        />
         <KpiCard
           label="COD outstanding"
           value={money(

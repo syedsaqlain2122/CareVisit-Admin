@@ -4,6 +4,7 @@ import { RequireAuth } from '@/components/RequireAuth';
 import { StoreProvider } from '@/lib/store';
 import { AdminsPage } from '@/pages/AdminsPage';
 import { DashboardPage } from '@/pages/DashboardPage';
+import { InsurancePage } from '@/pages/InsurancePage';
 import { LoginPage } from '@/pages/LoginPage';
 import { PatientsPage } from '@/pages/PatientsPage';
 import { PaymentsPage } from '@/pages/PaymentsPage';
@@ -24,6 +25,7 @@ export default function App() {
               <Route path="/" element={<DashboardPage />} />
               <Route path="/requests" element={<RequestsPage />} />
               <Route path="/verification" element={<VerificationPage />} />
+              <Route path="/insurance" element={<InsurancePage />} />
               <Route path="/staff" element={<StaffPage />} />
               <Route path="/patients" element={<PatientsPage />} />
               <Route path="/pharmacy" element={<PharmacyPage />} />

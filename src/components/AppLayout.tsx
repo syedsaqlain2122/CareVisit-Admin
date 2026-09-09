@@ -10,6 +10,7 @@ const NAV = [
       { to: '/', label: 'Overview', icon: HomeIcon },
       { to: '/requests', label: 'Visit queue', icon: QueueIcon },
       { to: '/verification', label: 'ID review', icon: ShieldIcon },
+      { to: '/insurance', label: 'Insurance', icon: CardIcon },
     ],
   },
   {
@@ -58,6 +59,15 @@ function ShieldIcon() {
     <IconWrap>
       <path d="M12 3 5 6v6c0 4.2 2.8 7.2 7 9 4.2-1.8 7-4.8 7-9V6z" />
       <path d="m9 12 2 2 4-4" />
+    </IconWrap>
+  );
+}
+function CardIcon() {
+  return (
+    <IconWrap>
+      <rect x="3" y="6" width="18" height="12" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M7 15h4" />
     </IconWrap>
   );
 }

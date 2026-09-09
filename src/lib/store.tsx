@@ -14,6 +14,7 @@ import {
   type AdminAccount,
   type CatalogMedicine,
   type IdReview,
+  type InsuranceReview,
   type MedicineCategory,
   type MedicineInput,
   type Nurse,
@@ -197,6 +198,7 @@ type LiveState = {
   medicines: CatalogMedicine[];
   admins: AdminAccount[];
   idReviews: IdReview[];
+  insuranceReviews: InsuranceReview[];
 };
 
 const EMPTY: LiveState = {
@@ -207,6 +209,7 @@ const EMPTY: LiveState = {
   medicines: [],
   admins: [],
   idReviews: [],
+  insuranceReviews: [],
 };
 
 type StoreApi = LiveState & {
@@ -225,6 +228,11 @@ type StoreApi = LiveState & {
   setVerification: (
     profileId: string,
     status: Extract<VerificationStatus, 'approved' | 'rejected'>,
+    reason?: string,
+  ) => Promise<string | null>;
+  setInsuranceStatus: (
+    policyId: string,
+    status: 'approved' | 'rejected',
     reason?: string,
   ) => Promise<string | null>;
   setOrderStatus: (id: string, status: OrderStatus) => Promise<string | null>;
@@ -276,6 +284,8 @@ function docLabel(docType: string): string {
   if (docType === 'id_front') return 'ID front';
   if (docType === 'id_back') return 'ID back';
   if (docType === 'nurse_license') return 'Nursing license';
+  if (docType === 'insurance_front') return 'Card front';
+  if (docType === 'insurance_back') return 'Card back';
   return docType.replaceAll('_', ' ');
 }
 
@@ -304,6 +314,49 @@ async function signedUrlMap(bucket: string, paths: string[]): Promise<Map<string
     if (!map.has(path)) map.set(path, data?.[i]?.signedUrl ?? null);
   });
   return map;
+}
+
+function insuranceDocs(docs: { doc_type?: string; file_url?: string }[]): { docType: string; path: string }[] {
+  const wanted = ['insurance_front', 'insurance_back'];
+  return docs
+    .filter((d) => d.doc_type && d.file_url && wanted.includes(d.doc_type))
+    .map((d) => ({ docType: d.doc_type as string, path: d.file_url as string }));
+}
+
+function providerLabel(provider: string, other: string | null): string {
+  if (provider === 'Other') return other?.trim() || 'Other';
+  return provider;
+}
+
+function mapInsuranceReview(
+  row: Record<string, unknown>,
+  docsByProfile: Map<string, { doc_type?: string; file_url?: string }[]>,
+  urls: Map<string, string | null>,
+): InsuranceReview {
+  const patient = first(
+    row.patient as OneOrMany<{
+      full_name?: string | null;
+      phone?: string | null;
+      email?: string | null;
+    }>,
+  );
+  const profileId = String(row.profile_id);
+  const docs: ReviewDoc[] = insuranceDocs(docsByProfile.get(profileId) ?? []).map((d) => ({
+    docType: d.docType,
+    label: docLabel(d.docType),
+    path: d.path,
+    signedUrl: urls.get(d.path) ?? null,
+  }));
+  return {
+    id: String(row.id),
+    profileId,
+    name: patient?.full_name || 'Patient',
+    phone: patient?.phone || '—',
+    email: patient?.email || '—',
+    provider: providerLabel(String(row.provider ?? ''), (row.provider_other as string | null) ?? null),
+    policyNumber: String(row.policy_number ?? '—'),
+    docs,
+  };
 }
 
 function mapIdReview(row: Record<string, unknown>, urls: Map<string, string | null>): IdReview {
@@ -341,7 +394,8 @@ function mapIdReview(row: Record<string, unknown>, urls: Map<string, string | nu
 }
 
 async function fetchLive(): Promise<LiveState> {
-  const [nursesRes, patientsRes, visitsRes, ordersRes, medicinesRes, adminsRes, reviewsRes] = await Promise.all([
+  const [nursesRes, patientsRes, visitsRes, ordersRes, medicinesRes, adminsRes, reviewsRes, insuranceRes] =
+    await Promise.all([
     supabase
       .from('profiles')
       .select(
@@ -401,6 +455,16 @@ async function fetchLive(): Promise<LiveState> {
       .eq('verification_status', 'under_review')
       .in('role', ['patient', 'nurse'])
       .order('created_at', { ascending: false }),
+    supabase
+      .from('insurance_policies')
+      .select(
+        `
+        id, profile_id, provider, provider_other, policy_number, created_at,
+        patient:profiles!insurance_policies_profile_id_fkey (full_name, phone, email)
+      `,
+      )
+      .eq('status', 'under_review')
+      .order('created_at', { ascending: false }),
   ]);
 
   const firstError =
@@ -410,16 +474,39 @@ async function fetchLive(): Promise<LiveState> {
     ordersRes.error?.message ||
     medicinesRes.error?.message ||
     adminsRes.error?.message ||
-    reviewsRes.error?.message;
+    reviewsRes.error?.message ||
+    insuranceRes.error?.message;
   if (firstError) throw new Error(firstError);
 
   const reviewRows = (reviewsRes.data ?? []) as Record<string, unknown>[];
+  const insuranceRows = (insuranceRes.data ?? []) as Record<string, unknown>[];
+  const insuranceProfileIds = insuranceRows.map((row) => String(row.profile_id)).filter(Boolean);
+  const insuranceDocsRes =
+    insuranceProfileIds.length === 0
+      ? { data: [] as { profile_id: string; doc_type?: string; file_url?: string }[], error: null }
+      : await supabase
+          .from('verification_documents')
+          .select('profile_id, doc_type, file_url')
+          .in('profile_id', insuranceProfileIds)
+          .in('doc_type', ['insurance_front', 'insurance_back']);
+  if (insuranceDocsRes.error) throw new Error(insuranceDocsRes.error.message);
+
+  const docsByProfile = new Map<string, { doc_type?: string; file_url?: string }[]>();
+  for (const doc of insuranceDocsRes.data ?? []) {
+    const list = docsByProfile.get(doc.profile_id) ?? [];
+    list.push(doc);
+    docsByProfile.set(doc.profile_id, list);
+  }
+
   const paths: string[] = [];
   for (const row of reviewRows) {
     const role = row.role === 'nurse' ? 'nurse' : 'patient';
     const rawDocs = row.verification_documents as OneOrMany<{ doc_type?: string; file_url?: string }>;
     const docList = !rawDocs ? [] : Array.isArray(rawDocs) ? rawDocs : [rawDocs];
     for (const d of relevantDocs(role, docList)) paths.push(d.path);
+  }
+  for (const list of docsByProfile.values()) {
+    for (const d of insuranceDocs(list)) paths.push(d.path);
   }
   const orderRows = (ordersRes.data ?? []) as Record<string, unknown>[];
   const rxPaths = orderRows
@@ -438,6 +525,7 @@ async function fetchLive(): Promise<LiveState> {
     medicines: (medicinesRes.data ?? []).map((row: Record<string, unknown>) => mapMedicine(row)),
     admins: (adminsRes.data ?? []).map((row: Record<string, unknown>) => mapAdmin(row)),
     idReviews: reviewRows.map((row) => mapIdReview(row, urls)),
+    insuranceReviews: insuranceRows.map((row) => mapInsuranceReview(row, docsByProfile, urls)),
   };
 }
 
@@ -596,6 +684,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           .update({ status })
           .eq('profile_id', profileId)
           .in('doc_type', docTypes);
+
+        await refresh();
+        return null;
+      },
+      setInsuranceStatus: async (policyId, status, reason) => {
+        const row = data.insuranceReviews.find((r) => r.id === policyId);
+        const { error: updateError } = await supabase
+          .from('insurance_policies')
+          .update({
+            status,
+            rejection_reason: status === 'rejected' ? reason?.trim() || null : null,
+          })
+          .eq('id', policyId)
+          .eq('status', 'under_review');
+        if (updateError) return updateError.message;
+
+        if (row?.profileId) {
+          await supabase
+            .from('verification_documents')
+            .update({ status })
+            .eq('profile_id', row.profileId)
+            .in('doc_type', ['insurance_front', 'insurance_back']);
+        }
 
         await refresh();
         return null;

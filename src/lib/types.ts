@@ -104,6 +104,17 @@ export type IdReview = {
   docs: ReviewDoc[];
 };
 
+export type InsuranceReview = {
+  id: string;
+  profileId: string;
+  name: string;
+  phone: string;
+  email: string;
+  provider: string;
+  policyNumber: string;
+  docs: ReviewDoc[];
+};
+
 export type VisitRequest = {
   id: string;
   code: string;
