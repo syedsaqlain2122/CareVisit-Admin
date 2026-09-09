@@ -115,6 +115,17 @@ export type InsuranceReview = {
   docs: ReviewDoc[];
 };
 
+export type NurseReview = {
+  id: string;
+  nurseName: string;
+  rating: number;
+  comment: string | null;
+  visitId: string;
+  visitCode: string;
+  visitService: string;
+  createdAt: string;
+};
+
 export type VisitRequest = {
   id: string;
   code: string;
@@ -185,6 +196,12 @@ export function chipClass(status: string) {
   }
   if (status === 'confirmed') return 'assigned';
   return status;
+}
+
+export function ratingChip(rating: number) {
+  if (rating <= 2) return 'cancelled';
+  if (rating === 3) return 'assigned';
+  return 'approved';
 }
 
 export function orderPayment(status: OrderStatus): PharmacyOrder['payment'] {

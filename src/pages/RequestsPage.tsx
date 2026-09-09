@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { EmptyState, PersonCell } from '@/components/ui';
 import { money, nurseName, useStore } from '@/lib/store';
 import {
@@ -12,6 +13,8 @@ import {
 
 export function RequestsPage() {
   const { visits, nurses, assignVisit, setVisitStatus, cancelVisit } = useStore();
+  const [params] = useSearchParams();
+  const focusId = params.get('visit');
   const [filter, setFilter] = useState<'all' | VisitStatus>('all');
   const [selected, setSelected] = useState<VisitRequest | null>(null);
   const [nurseId, setNurseId] = useState('');
@@ -22,15 +25,21 @@ export function RequestsPage() {
   const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
+    if (focusId) setFilter('all');
+  }, [focusId]);
+
+  useEffect(() => {
     setSelected((prev) => {
+      const fromQuery = focusId ? visits.find((v) => v.id === focusId) : null;
       return (
+        fromQuery ??
         (prev ? visits.find((v) => v.id === prev.id) : null) ??
         visits.find((v) => isQueuedVisit(v.status)) ??
         visits[0] ??
         null
       );
     });
-  }, [visits]);
+  }, [visits, focusId]);
 
   useEffect(() => {
     setNurseId((prev) => {
@@ -42,6 +51,9 @@ export function RequestsPage() {
   useEffect(() => {
     setCancelReason('');
     setMessage(null);
+    if (selected?.nurseId) setNurseId(selected.nurseId);
+    if (selected?.windowStart) setStart(selected.windowStart);
+    if (selected?.windowEnd) setEnd(selected.windowEnd);
   }, [selected?.id]);
 
   const rows = useMemo(

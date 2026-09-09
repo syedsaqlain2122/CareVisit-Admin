@@ -11,6 +11,7 @@ import { PaymentsPage } from '@/pages/PaymentsPage';
 import { PharmacyPage } from '@/pages/PharmacyPage';
 import { ReportsPage } from '@/pages/ReportsPage';
 import { RequestsPage } from '@/pages/RequestsPage';
+import { ReviewsPage } from '@/pages/ReviewsPage';
 import { StaffPage } from '@/pages/StaffPage';
 import { VerificationPage } from '@/pages/VerificationPage';
 
@@ -27,6 +28,7 @@ export default function App() {
               <Route path="/verification" element={<VerificationPage />} />
               <Route path="/insurance" element={<InsurancePage />} />
               <Route path="/staff" element={<StaffPage />} />
+              <Route path="/reviews" element={<ReviewsPage />} />
               <Route path="/patients" element={<PatientsPage />} />
               <Route path="/pharmacy" element={<PharmacyPage />} />
               <Route path="/payments" element={<PaymentsPage />} />

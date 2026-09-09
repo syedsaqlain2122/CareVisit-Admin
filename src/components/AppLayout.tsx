@@ -17,6 +17,7 @@ const NAV = [
     label: 'People',
     items: [
       { to: '/staff', label: 'Staff roster', icon: StaffIcon },
+      { to: '/reviews', label: 'Reviews', icon: StarIcon },
       { to: '/patients', label: 'Patients', icon: PeopleIcon },
       { to: '/admins', label: 'Admin users', icon: KeyIcon },
     ],
@@ -76,6 +77,13 @@ function StaffIcon() {
     <IconWrap>
       <circle cx="12" cy="8" r="3.2" />
       <path d="M5.5 19.5c1.2-3.2 3.4-4.8 6.5-4.8s5.3 1.6 6.5 4.8" />
+    </IconWrap>
+  );
+}
+function StarIcon() {
+  return (
+    <IconWrap>
+      <path d="M12 3.6 14.5 9l6 .7-4.4 4 1.2 5.8L12 16.8 6.7 19.5l1.2-5.8L3.5 9.7l6-.7z" />
     </IconWrap>
   );
 }

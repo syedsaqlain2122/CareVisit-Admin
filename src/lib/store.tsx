@@ -18,6 +18,7 @@ import {
   type MedicineCategory,
   type MedicineInput,
   type Nurse,
+  type NurseReview,
   type OrderLineItem,
   type OrderStatus,
   type Patient,
@@ -199,6 +200,7 @@ type LiveState = {
   admins: AdminAccount[];
   idReviews: IdReview[];
   insuranceReviews: InsuranceReview[];
+  nurseReviews: NurseReview[];
 };
 
 const EMPTY: LiveState = {
@@ -210,6 +212,7 @@ const EMPTY: LiveState = {
   admins: [],
   idReviews: [],
   insuranceReviews: [],
+  nurseReviews: [],
 };
 
 type StoreApi = LiveState & {
@@ -393,8 +396,31 @@ function mapIdReview(row: Record<string, unknown>, urls: Map<string, string | nu
   };
 }
 
+function mapNurseReview(row: Record<string, unknown>): NurseReview {
+  const nurse = first(row.nurse as OneOrMany<{ full_name?: string | null }>);
+  const visit = first(
+    row.visit as OneOrMany<{
+      public_code?: string | null;
+      service?: OneOrMany<{ title?: string | null }>;
+    }>,
+  );
+  const service = first(visit?.service ?? null);
+  const visitId = String(row.visit_request_id ?? '');
+  const rating = Math.min(5, Math.max(1, Math.round(Number(row.rating ?? 1))));
+  return {
+    id: String(row.id),
+    nurseName: nurse?.full_name?.trim() || 'Nurse',
+    rating,
+    comment: ((row.comment as string | null) ?? '').trim() || null,
+    visitId,
+    visitCode: String(visit?.public_code ?? visitId).slice(0, 12),
+    visitService: service?.title?.trim() || 'Visit',
+    createdAt: String(row.created_at ?? ''),
+  };
+}
+
 async function fetchLive(): Promise<LiveState> {
-  const [nursesRes, patientsRes, visitsRes, ordersRes, medicinesRes, adminsRes, reviewsRes, insuranceRes] =
+  const [nursesRes, patientsRes, visitsRes, ordersRes, medicinesRes, adminsRes, reviewsRes, insuranceRes, nurseReviewsRes] =
     await Promise.all([
     supabase
       .from('profiles')
@@ -465,6 +491,20 @@ async function fetchLive(): Promise<LiveState> {
       )
       .eq('status', 'under_review')
       .order('created_at', { ascending: false }),
+    supabase
+      .from('reviews')
+      .select(
+        `
+        id, rating, comment, created_at, visit_request_id,
+        nurse:profiles!reviews_nurse_id_fkey (full_name),
+        visit:visit_requests!reviews_visit_request_id_fkey (
+          public_code,
+          service:services (title)
+        )
+      `,
+      )
+      .order('rating', { ascending: true })
+      .order('created_at', { ascending: false }),
   ]);
 
   const firstError =
@@ -475,7 +515,8 @@ async function fetchLive(): Promise<LiveState> {
     medicinesRes.error?.message ||
     adminsRes.error?.message ||
     reviewsRes.error?.message ||
-    insuranceRes.error?.message;
+    insuranceRes.error?.message ||
+    nurseReviewsRes.error?.message;
   if (firstError) throw new Error(firstError);
 
   const reviewRows = (reviewsRes.data ?? []) as Record<string, unknown>[];
@@ -526,6 +567,9 @@ async function fetchLive(): Promise<LiveState> {
     admins: (adminsRes.data ?? []).map((row: Record<string, unknown>) => mapAdmin(row)),
     idReviews: reviewRows.map((row) => mapIdReview(row, urls)),
     insuranceReviews: insuranceRows.map((row) => mapInsuranceReview(row, docsByProfile, urls)),
+    nurseReviews: ((nurseReviewsRes.data ?? []) as Record<string, unknown>[])
+      .map(mapNurseReview)
+      .sort((a, b) => a.rating - b.rating || b.createdAt.localeCompare(a.createdAt)),
   };
 }
 
