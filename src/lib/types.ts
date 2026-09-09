@@ -13,6 +13,46 @@ export type VerificationStatus = 'unverified' | 'under_review' | 'approved' | 'r
 
 export type OrderStatus = 'placed' | 'confirmed' | 'out_for_delivery' | 'delivered' | 'cancelled';
 
+export type MedicineCategory = 'pain' | 'antibiotics' | 'vitamins' | 'allergy' | 'first_aid';
+
+export const MEDICINE_CATEGORIES: { key: MedicineCategory; label: string }[] = [
+  { key: 'pain', label: 'Pain relief' },
+  { key: 'antibiotics', label: 'Antibiotics' },
+  { key: 'vitamins', label: 'Vitamins' },
+  { key: 'allergy', label: 'Allergy' },
+  { key: 'first_aid', label: 'First aid' },
+];
+
+export type CatalogMedicine = {
+  id: string;
+  name: string;
+  subtitle: string;
+  pricePkr: number;
+  category: MedicineCategory;
+  rxRequired: boolean;
+  available: boolean;
+  description: string;
+  imageUrl: string | null;
+};
+
+export type OrderLineItem = {
+  name: string;
+  qty: number;
+  unitPricePkr: number;
+};
+
+export type MedicineInput = {
+  id?: string;
+  name: string;
+  subtitle: string;
+  pricePkr: number;
+  category: MedicineCategory;
+  description: string;
+  rxRequired: boolean;
+  available: boolean;
+  imageFile?: File | null;
+};
+
 export type AdminAccount = {
   id: string;
   name: string;
@@ -89,10 +129,20 @@ export type PharmacyOrder = {
   id: string;
   code: string;
   patientName: string;
+  patientPhone: string;
   items: string;
+  lineItems: OrderLineItem[];
+  subtotalPkr: number;
+  taxPkr: number;
   totalPkr: number;
   status: OrderStatus;
   payment: 'cod_unpaid' | 'cod_collected';
+  paymentMethod: 'Cash on delivery';
+  addressLabel: string | null;
+  addressLine: string | null;
+  addressNotes: string | null;
+  prescriptionPath: string | null;
+  prescriptionUrl: string | null;
   createdAt: string;
   cancellationReason: string | null;
   cancelledBy: 'patient' | 'admin' | null;

@@ -415,6 +415,36 @@ tbody tr:last-child td { border-bottom: 0; }
 }
 .review-doc-link { font-weight: 700; }
 
+.med-cell { display: flex; align-items: center; gap: 10px; }
+.med-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.med-thumb-empty { display: inline-block; }
+.med-preview {
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  margin-top: 8px;
+}
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.lines-table { width: 100%; font-size: 13px; }
+.lines-table th { font-size: 11px; color: var(--ink-500); }
+
 .panel-kicker { font-size: 12px; color: var(--ink-500); font-weight: 600; }
 .assign-panel {
   background:

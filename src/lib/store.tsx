@@ -9,10 +9,15 @@ import {
 } from 'react';
 import { invokeAdminAuth, supabase } from './supabase';
 import {
+  MEDICINE_CATEGORIES,
   orderPayment,
   type AdminAccount,
+  type CatalogMedicine,
   type IdReview,
+  type MedicineCategory,
+  type MedicineInput,
   type Nurse,
+  type OrderLineItem,
   type OrderStatus,
   type Patient,
   type PharmacyOrder,
@@ -103,29 +108,74 @@ function mapPatient(row: Record<string, unknown>): Patient {
   };
 }
 
-function mapOrder(row: Record<string, unknown>): PharmacyOrder {
-  const patient = first(row.patient as OneOrMany<{ full_name?: string }>);
-  const items = row.order_items as OneOrMany<{ qty?: number; medicines?: OneOrMany<{ name?: string }> }> | undefined;
+function mapOrder(row: Record<string, unknown>, rxUrls: Map<string, string | null>): PharmacyOrder {
+  const patient = first(row.patient as OneOrMany<{ full_name?: string; phone?: string }>);
+  const address = first(
+    row.delivery as OneOrMany<{ label?: string; line?: string; area_label?: string; notes?: string }>,
+  );
+  const items = row.order_items as
+    | OneOrMany<{ qty?: number; unit_price_pkr?: number; medicines?: OneOrMany<{ name?: string }> }>
+    | undefined;
   const list = !items ? [] : Array.isArray(items) ? items : [items];
-  const labels = list.map((item) => {
+  const lineItems: OrderLineItem[] = list.map((item) => {
     const med = first(item.medicines ?? null);
-    return `${item.qty ?? 1}× ${med?.name ?? 'Item'}`;
+    return {
+      name: med?.name ?? 'Item',
+      qty: Number(item.qty ?? 1),
+      unitPricePkr: Number(item.unit_price_pkr ?? 0),
+    };
   });
+  const labels = lineItems.map((item) => `${item.qty}× ${item.name}`);
   const status = (row.status as OrderStatus) ?? 'placed';
+  const rxPath = ((row.prescription_path as string | null) ?? '').trim() || null;
+  const addressParts = [address?.line, address?.area_label].filter(Boolean);
   return {
     id: String(row.id),
     code: String(row.public_code ?? row.id).slice(0, 12),
     patientName: patient?.full_name || 'Patient',
+    patientPhone: patient?.phone?.trim() || '—',
     items: labels.join(', ') || '—',
+    lineItems,
+    subtotalPkr: Number(row.subtotal_pkr ?? 0),
+    taxPkr: Number(row.tax_pkr ?? 0),
     totalPkr: Number(row.total_pkr ?? 0),
     status,
     payment: orderPayment(status),
+    paymentMethod: 'Cash on delivery',
+    addressLabel: address?.label?.trim() || null,
+    addressLine: addressParts.length > 0 ? addressParts.join(', ') : null,
+    addressNotes: address?.notes?.trim() || null,
+    prescriptionPath: rxPath,
+    prescriptionUrl: rxPath ? rxUrls.get(rxPath) ?? null : null,
     createdAt: String(row.created_at ?? ''),
     cancellationReason: ((row.cancellation_reason as string | null) ?? '').trim() || null,
     cancelledBy:
-      row.cancelled_by === 'patient' || row.cancelled_by === 'admin'
-        ? row.cancelled_by
-        : null,
+      row.cancelled_by === 'patient' || row.cancelled_by === 'admin' ? row.cancelled_by : null,
+  };
+}
+
+function isMedicineCategory(value: string): value is MedicineCategory {
+  return MEDICINE_CATEGORIES.some((c) => c.key === value);
+}
+
+function mapMedicine(row: Record<string, unknown>): CatalogMedicine {
+  const category = String(row.category ?? 'pain');
+  const description = row.description;
+  const text = Array.isArray(description)
+    ? description.filter((d) => typeof d === 'string').join('\n\n')
+    : typeof description === 'string'
+      ? description
+      : '';
+  return {
+    id: String(row.id),
+    name: (row.name as string) || 'Medicine',
+    subtitle: (row.subtitle as string) || '',
+    pricePkr: Number(row.price_pkr ?? 0),
+    category: isMedicineCategory(category) ? category : 'pain',
+    rxRequired: Boolean(row.rx_required),
+    available: row.available !== false,
+    description: text,
+    imageUrl: ((row.image_url as string | null) ?? '').trim() || null,
   };
 }
 
@@ -143,6 +193,7 @@ type LiveState = {
   patients: Patient[];
   visits: VisitRequest[];
   orders: PharmacyOrder[];
+  medicines: CatalogMedicine[];
   admins: AdminAccount[];
   idReviews: IdReview[];
 };
@@ -152,6 +203,7 @@ const EMPTY: LiveState = {
   patients: [],
   visits: [],
   orders: [],
+  medicines: [],
   admins: [],
   idReviews: [],
 };
@@ -176,11 +228,41 @@ type StoreApi = LiveState & {
   ) => Promise<string | null>;
   setOrderStatus: (id: string, status: OrderStatus) => Promise<string | null>;
   cancelOrder: (id: string, reason: string) => Promise<string | null>;
+  saveMedicine: (input: MedicineInput) => Promise<string | null>;
   toggleNurseAccepting: (id: string) => Promise<string | null>;
   setNurseSuspended: (id: string, suspended: boolean) => Promise<string | null>;
 };
 
 const StoreContext = createContext<StoreApi | null>(null);
+
+function slugifyMedicineId(name: string): string {
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+  return base || 'medicine';
+}
+
+function descriptionList(raw: string): string[] {
+  const parts = raw
+    .split(/\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  return parts.length > 0 ? parts : [];
+}
+
+async function uploadMedicineImage(medicineId: string, file: File): Promise<string> {
+  const ext = file.type.includes('png') ? 'png' : file.type.includes('webp') ? 'webp' : 'jpg';
+  const path = `${medicineId}/${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from('medicine-images').upload(path, file, {
+    contentType: file.type || `image/${ext}`,
+    upsert: true,
+  });
+  if (error) throw new Error(error.message || 'Could not upload image.');
+  const { data } = supabase.storage.from('medicine-images').getPublicUrl(path);
+  return data.publicUrl;
+}
 
 function formatDob(iso: string | null): string | null {
   if (!iso) return null;
@@ -203,11 +285,11 @@ function relevantDocs(role: string, docs: { doc_type?: string; file_url?: string
     .map((d) => ({ docType: d.doc_type as string, path: d.file_url as string }));
 }
 
-async function signedUrlMap(paths: string[]): Promise<Map<string, string | null>> {
+async function signedUrlMap(bucket: string, paths: string[]): Promise<Map<string, string | null>> {
   const unique = [...new Set(paths.filter(Boolean))];
   const map = new Map<string, string | null>();
   if (unique.length === 0) return map;
-  const { data, error } = await supabase.storage.from('verification-docs').createSignedUrls(unique, 60 * 60);
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrls(unique, 60 * 60);
   if (error) {
     unique.forEach((p) => map.set(p, null));
     return map;
@@ -258,7 +340,7 @@ function mapIdReview(row: Record<string, unknown>, urls: Map<string, string | nu
 }
 
 async function fetchLive(): Promise<LiveState> {
-  const [nursesRes, patientsRes, visitsRes, ordersRes, adminsRes, reviewsRes] = await Promise.all([
+  const [nursesRes, patientsRes, visitsRes, ordersRes, medicinesRes, adminsRes, reviewsRes] = await Promise.all([
     supabase
       .from('profiles')
       .select(
@@ -288,12 +370,18 @@ async function fetchLive(): Promise<LiveState> {
       .from('orders')
       .select(
         `
-        id, public_code, status, total_pkr, created_at, cancellation_reason, cancelled_by,
-        patient:profiles!orders_patient_id_fkey (full_name),
-        order_items (qty, medicines (name))
+        id, public_code, status, subtotal_pkr, tax_pkr, total_pkr, created_at,
+        cancellation_reason, cancelled_by, prescription_path,
+        patient:profiles!orders_patient_id_fkey (full_name, phone),
+        delivery:addresses!orders_delivery_address_id_fkey (label, line, area_label, notes),
+        order_items (qty, unit_price_pkr, medicines (name))
       `,
       )
       .order('created_at', { ascending: false }),
+    supabase
+      .from('medicines')
+      .select('id, name, subtitle, price_pkr, category, rx_required, available, description, image_url')
+      .order('name'),
     supabase
       .from('profiles')
       .select('id, full_name, email, created_at')
@@ -319,6 +407,7 @@ async function fetchLive(): Promise<LiveState> {
     patientsRes.error?.message ||
     visitsRes.error?.message ||
     ordersRes.error?.message ||
+    medicinesRes.error?.message ||
     adminsRes.error?.message ||
     reviewsRes.error?.message;
   if (firstError) throw new Error(firstError);
@@ -331,13 +420,21 @@ async function fetchLive(): Promise<LiveState> {
     const docList = !rawDocs ? [] : Array.isArray(rawDocs) ? rawDocs : [rawDocs];
     for (const d of relevantDocs(role, docList)) paths.push(d.path);
   }
-  const urls = await signedUrlMap(paths);
+  const orderRows = (ordersRes.data ?? []) as Record<string, unknown>[];
+  const rxPaths = orderRows
+    .map((row) => ((row.prescription_path as string | null) ?? '').trim())
+    .filter(Boolean);
+  const [urls, rxUrls] = await Promise.all([
+    signedUrlMap('verification-docs', paths),
+    signedUrlMap('prescriptions', rxPaths),
+  ]);
 
   return {
     nurses: (nursesRes.data ?? []).map((row: Record<string, unknown>) => mapNurse(row)),
     patients: (patientsRes.data ?? []).map((row: Record<string, unknown>) => mapPatient(row)),
     visits: (visitsRes.data ?? []).map((row: Record<string, unknown>) => mapVisit(row)),
-    orders: (ordersRes.data ?? []).map((row: Record<string, unknown>) => mapOrder(row)),
+    orders: orderRows.map((row) => mapOrder(row, rxUrls)),
+    medicines: (medicinesRes.data ?? []).map((row: Record<string, unknown>) => mapMedicine(row)),
     admins: (adminsRes.data ?? []).map((row: Record<string, unknown>) => mapAdmin(row)),
     idReviews: reviewRows.map((row) => mapIdReview(row, urls)),
   };
@@ -521,6 +618,49 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           .neq('status', 'cancelled')
           .neq('status', 'delivered');
         if (updateError) return updateError.message;
+        await refresh();
+        return null;
+      },
+      saveMedicine: async (input) => {
+        const name = input.name.trim();
+        if (!name) return 'Add a medicine name.';
+        const price = Number(input.pricePkr);
+        if (!Number.isFinite(price) || price < 0) return 'Enter a valid price.';
+
+        let id = input.id?.trim() || slugifyMedicineId(name);
+        if (!input.id) {
+          const taken = data.medicines.some((m) => m.id === id);
+          if (taken) id = `${id}-${Date.now().toString(36).slice(-4)}`;
+        }
+
+        let imageUrl: string | undefined;
+        if (input.imageFile) {
+          try {
+            imageUrl = await uploadMedicineImage(id, input.imageFile);
+          } catch (e) {
+            return e instanceof Error ? e.message : 'Could not upload image.';
+          }
+        }
+
+        const description = descriptionList(input.description);
+        const payload: Record<string, unknown> = {
+          name,
+          subtitle: input.subtitle.trim(),
+          price_pkr: price,
+          category: input.category,
+          rx_required: input.rxRequired,
+          available: input.available,
+          description,
+        };
+        if (imageUrl) {
+          payload.image_url = imageUrl;
+          payload.image_urls = [imageUrl];
+        }
+
+        const { error: writeError } = input.id
+          ? await supabase.from('medicines').update(payload).eq('id', id)
+          : await supabase.from('medicines').insert({ id, ...payload });
+        if (writeError) return writeError.message;
         await refresh();
         return null;
       },
