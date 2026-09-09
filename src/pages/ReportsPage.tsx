@@ -1,12 +1,17 @@
-import { EmptyState, KpiCard } from '@/components/ui';
+import { EmptyState, KpiCard, PersonCell } from '@/components/ui';
 import { money, useStore } from '@/lib/store';
+import { chipClass } from '@/lib/types';
 
 export function ReportsPage() {
   const { visits, patients, orders, nurses } = useStore();
   const completed = visits.filter((v) => v.status === 'completed');
-  const cancelled = visits.filter((v) => v.status === 'cancelled');
+  const cancelledVisits = visits.filter((v) => v.status === 'cancelled');
+  const cancelledOrders = orders.filter((o) => o.status === 'cancelled');
   const approved = patients.filter((p) => p.verification === 'approved').length;
   const total = Math.max(visits.length, 1);
+  const pharmacyGmv = orders
+    .filter((o) => o.status !== 'cancelled')
+    .reduce((s, o) => s + o.totalPkr, 0);
 
   const byService = visits.reduce<Record<string, number>>((acc, v) => {
     acc[v.service] = (acc[v.service] ?? 0) + 1;
@@ -24,9 +29,9 @@ export function ReportsPage() {
       </div>
       <div className="grid-4" style={{ marginBottom: 16 }}>
         <KpiCard label="Completed visits" value={completed.length} tone="care" />
-        <KpiCard label="Cancelled" value={cancelled.length} tone="warm" />
+        <KpiCard label="Cancelled visits" value={cancelledVisits.length} tone="warm" />
+        <KpiCard label="Cancelled orders" value={cancelledOrders.length} tone="warm" />
         <KpiCard label="Verified patients" value={approved} tone="primary" />
-        <KpiCard label="Nurses rostered" value={nurses.length} tone="deep" />
       </div>
       <div className="grid-2">
         <div className="card">
@@ -51,10 +56,76 @@ export function ReportsPage() {
           <div>
             <h3 style={{ marginTop: 0 }}>Pharmacy GMV</h3>
             <p className="display" style={{ fontSize: 40, margin: '12px 0 0' }}>
-              {money(orders.reduce((s, o) => s + o.totalPkr, 0))}
+              {money(pharmacyGmv)}
             </p>
           </div>
-          <p className="muted">{orders.length} orders in this workspace</p>
+          <p className="muted">
+            {orders.filter((o) => o.status !== 'cancelled').length} active orders · {nurses.length} nurses rostered
+          </p>
+        </div>
+      </div>
+      <div className="grid-2" style={{ marginTop: 16 }}>
+        <div className="card card-flush table-wrap">
+          <h3 style={{ margin: '16px 16px 0' }}>Cancelled visits</h3>
+          {cancelledVisits.length === 0 ? (
+            <EmptyState title="No cancelled visits" body="Patient and admin cancellations will list here with a reason." />
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Visit</th>
+                  <th>Patient</th>
+                  <th>By</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cancelledVisits.map((v) => (
+                  <tr key={v.id}>
+                    <td className="mono">{v.code}</td>
+                    <td>
+                      <PersonCell name={v.patientName} meta={v.service} />
+                    </td>
+                    <td>
+                      <span className={`chip ${chipClass('cancelled')}`}>{v.cancelledBy ?? 'cancelled'}</span>
+                    </td>
+                    <td>{v.cancellationReason || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div className="card card-flush table-wrap">
+          <h3 style={{ margin: '16px 16px 0' }}>Cancelled orders</h3>
+          {cancelledOrders.length === 0 ? (
+            <EmptyState title="No cancelled orders" body="Patient and admin cancellations will list here with a reason." />
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Patient</th>
+                  <th>By</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cancelledOrders.map((o) => (
+                  <tr key={o.id}>
+                    <td className="mono">{o.code}</td>
+                    <td>
+                      <PersonCell name={o.patientName} />
+                    </td>
+                    <td>
+                      <span className={`chip ${chipClass('cancelled')}`}>{o.cancelledBy ?? 'cancelled'}</span>
+                    </td>
+                    <td>{o.cancellationReason || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </>

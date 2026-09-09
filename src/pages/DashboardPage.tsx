@@ -41,7 +41,11 @@ export function DashboardPage() {
         <KpiCard label="IDs to review" value={review} hint="Patients + nurses under review" tone="warm" />
         <KpiCard
           label="COD outstanding"
-          value={money(orders.filter((o) => o.payment === 'cod_unpaid').reduce((s, o) => s + o.totalPkr, 0))}
+          value={money(
+            orders
+              .filter((o) => o.payment === 'cod_unpaid' && o.status !== 'cancelled')
+              .reduce((s, o) => s + o.totalPkr, 0),
+          )}
           hint="Pharmacy not yet collected"
           tone="deep"
         />

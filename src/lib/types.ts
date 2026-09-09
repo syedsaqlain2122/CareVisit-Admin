@@ -81,6 +81,8 @@ export type VisitRequest = {
   notes: string;
   requiresRx: boolean;
   createdAt: string;
+  cancellationReason: string | null;
+  cancelledBy: 'patient' | 'admin' | null;
 };
 
 export type PharmacyOrder = {
@@ -92,6 +94,8 @@ export type PharmacyOrder = {
   status: OrderStatus;
   payment: 'cod_unpaid' | 'cod_collected';
   createdAt: string;
+  cancellationReason: string | null;
+  cancelledBy: 'patient' | 'admin' | null;
 };
 
 export const VISIT_STATUSES: VisitStatus[] = [
@@ -104,6 +108,10 @@ export const VISIT_STATUSES: VisitStatus[] = [
   'completed',
   'cancelled',
 ];
+
+export const VISIT_ADVANCE_STATUSES: VisitStatus[] = VISIT_STATUSES.filter(
+  (status) => status !== 'cancelled',
+);
 
 export function isQueuedVisit(status: VisitStatus) {
   return status === 'open' || status === 'pending_review' || status === 'draft';

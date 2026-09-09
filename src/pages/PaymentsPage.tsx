@@ -6,7 +6,9 @@ export function PaymentsPage() {
   const { visits, orders } = useStore();
   const visitFees = visits.filter((v) => v.status !== 'cancelled').reduce((s, v) => s + v.feePkr, 0);
   const collected = orders.filter((o) => o.payment === 'cod_collected').reduce((s, o) => s + o.totalPkr, 0);
-  const outstanding = orders.filter((o) => o.payment === 'cod_unpaid').reduce((s, o) => s + o.totalPkr, 0);
+  const outstanding = orders
+    .filter((o) => o.payment === 'cod_unpaid' && o.status !== 'cancelled')
+    .reduce((s, o) => s + o.totalPkr, 0);
 
   return (
     <>
@@ -45,8 +47,20 @@ export function PaymentsPage() {
                     </td>
                     <td className="mono">{money(v.feePkr)}</td>
                     <td>
-                      <span className={`chip ${v.status === 'completed' ? 'completed' : 'pending'}`}>
-                        {v.status === 'completed' ? 'paid to nurse' : 'due on arrival'}
+                      <span
+                        className={`chip ${
+                          v.status === 'cancelled'
+                            ? 'cancelled'
+                            : v.status === 'completed'
+                              ? 'completed'
+                              : 'pending'
+                        }`}
+                      >
+                        {v.status === 'cancelled'
+                          ? 'cancelled'
+                          : v.status === 'completed'
+                            ? 'paid to nurse'
+                            : 'due on arrival'}
                       </span>
                     </td>
                   </tr>
@@ -59,7 +73,9 @@ export function PaymentsPage() {
                     </td>
                     <td className="mono">{money(o.totalPkr)}</td>
                     <td>
-                      <span className={`chip ${chipClass(o.payment)}`}>{o.payment.replaceAll('_', ' ')}</span>
+                      <span className={`chip ${chipClass(o.status === 'cancelled' ? 'cancelled' : o.payment)}`}>
+                        {o.status === 'cancelled' ? 'cancelled' : o.payment.replaceAll('_', ' ')}
+                      </span>
                     </td>
                   </tr>
                 ))}

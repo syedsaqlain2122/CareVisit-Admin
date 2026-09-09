@@ -1,16 +1,25 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { EmptyState, PersonCell } from '@/components/ui';
 import { money, nurseName, useStore } from '@/lib/store';
-import { chipClass, isQueuedVisit, VISIT_STATUSES, type VisitRequest, type VisitStatus } from '@/lib/types';
+import {
+  chipClass,
+  isQueuedVisit,
+  VISIT_ADVANCE_STATUSES,
+  VISIT_STATUSES,
+  type VisitRequest,
+  type VisitStatus,
+} from '@/lib/types';
 
 export function RequestsPage() {
-  const { visits, nurses, assignVisit, setVisitStatus } = useStore();
+  const { visits, nurses, assignVisit, setVisitStatus, cancelVisit } = useStore();
   const [filter, setFilter] = useState<'all' | VisitStatus>('all');
   const [selected, setSelected] = useState<VisitRequest | null>(null);
   const [nurseId, setNurseId] = useState('');
   const [start, setStart] = useState('10:00');
   const [end, setEnd] = useState('12:00');
+  const [cancelReason, setCancelReason] = useState('');
   const [message, setMessage] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     setSelected((prev) => {
@@ -30,6 +39,11 @@ export function RequestsPage() {
     });
   }, [nurses]);
 
+  useEffect(() => {
+    setCancelReason('');
+    setMessage(null);
+  }, [selected?.id]);
+
   const rows = useMemo(
     () => (filter === 'all' ? visits : visits.filter((v) => v.status === filter)),
     [visits, filter],
@@ -41,6 +55,17 @@ export function RequestsPage() {
     const err = await assignVisit(selected.id, nurseId, start, end);
     setMessage(err);
   };
+
+  const onCancel = async () => {
+    if (!selected || cancelling) return;
+    setCancelling(true);
+    const err = await cancelVisit(selected.id, cancelReason);
+    setCancelling(false);
+    setMessage(err);
+    if (!err) setCancelReason('');
+  };
+
+  const cancelled = selected?.status === 'cancelled';
 
   return (
     <>
@@ -130,49 +155,79 @@ export function RequestsPage() {
                   <span className="muted"> · {selected.durationDays} day(s) · pay nurse on arrival</span>
                 </p>
               </div>
-              <form className="stack" onSubmit={(e) => void onAssign(e)}>
-                <div className="field">
-                  <label>Nurse</label>
-                  <select value={nurseId} onChange={(e) => setNurseId(e.target.value)}>
-                    {nurses.length === 0 ? <option value="">No nurses yet</option> : null}
-                    {nurses.map((n) => (
-                      <option key={n.id} value={n.id} disabled={n.suspended || !n.accepting}>
-                        {n.name}
-                        {n.suspended ? ' (suspended)' : n.accepting ? '' : ' (off)'}
-                      </option>
-                    ))}
-                  </select>
+              {cancelled ? (
+                <div className="error">
+                  Cancelled{selected.cancelledBy ? ` by ${selected.cancelledBy}` : ''}.
+                  {selected.cancellationReason ? ` Reason: ${selected.cancellationReason}` : ''}
+                  {selected.cancelledBy === 'patient'
+                    ? ' The assigned nurse was notified if one was already on the job.'
+                    : ' The patient and any assigned nurse were notified.'}
                 </div>
-                <div className="row">
-                  <div className="field" style={{ flex: 1 }}>
-                    <label>Window start</label>
-                    <input type="time" value={start} onChange={(e) => setStart(e.target.value)} />
+              ) : (
+                <>
+                  <form className="stack" onSubmit={(e) => void onAssign(e)}>
+                    <div className="field">
+                      <label>Nurse</label>
+                      <select value={nurseId} onChange={(e) => setNurseId(e.target.value)}>
+                        {nurses.length === 0 ? <option value="">No nurses yet</option> : null}
+                        {nurses.map((n) => (
+                          <option key={n.id} value={n.id} disabled={n.suspended || !n.accepting}>
+                            {n.name}
+                            {n.suspended ? ' (suspended)' : n.accepting ? '' : ' (off)'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="row">
+                      <div className="field" style={{ flex: 1 }}>
+                        <label>Window start</label>
+                        <input type="time" value={start} onChange={(e) => setStart(e.target.value)} />
+                      </div>
+                      <div className="field" style={{ flex: 1 }}>
+                        <label>Window end</label>
+                        <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
+                      </div>
+                    </div>
+                    <button className="btn btn-primary" type="submit" disabled={!nurseId}>
+                      Assign nurse
+                    </button>
+                  </form>
+                  <div className="field">
+                    <label>Advance status</label>
+                    <select
+                      value={selected.status === 'cancelled' ? 'open' : selected.status}
+                      onChange={(e) => {
+                        const status = e.target.value as VisitStatus;
+                        void setVisitStatus(selected.id, status);
+                      }}
+                    >
+                      {VISIT_ADVANCE_STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {s.replaceAll('_', ' ')}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <div className="field" style={{ flex: 1 }}>
-                    <label>Window end</label>
-                    <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
+                  <div className="field">
+                    <label htmlFor="visit-cancel-reason">Cancel on customer’s behalf</label>
+                    <textarea
+                      id="visit-cancel-reason"
+                      rows={2}
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      placeholder="Reason shown to the patient and assigned nurse (no-show, dispute…)"
+                    />
                   </div>
-                </div>
-                <button className="btn btn-primary" type="submit" disabled={!nurseId}>
-                  Assign nurse
-                </button>
-              </form>
-              <div className="field">
-                <label>Advance status</label>
-                <select
-                  value={selected.status}
-                  onChange={(e) => {
-                    const status = e.target.value as VisitStatus;
-                    void setVisitStatus(selected.id, status);
-                  }}
-                >
-                  {VISIT_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {s.replaceAll('_', ' ')}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  <button
+                    className="btn btn-danger"
+                    type="button"
+                    disabled={cancelling || !cancelReason.trim()}
+                    onClick={() => void onCancel()}
+                  >
+                    Cancel visit
+                  </button>
+                </>
+              )}
               {message ? <div className="error">{message}</div> : null}
               <p className="muted">Currently: {nurseName(nurses, selected.nurseId)}</p>
             </>

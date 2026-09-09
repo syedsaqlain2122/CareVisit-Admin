@@ -59,6 +59,11 @@ function mapVisit(row: Record<string, unknown>): VisitRequest {
     notes: (row.description as string | null) ?? '',
     requiresRx: Boolean(service?.requires_prescription),
     createdAt: String(row.created_at ?? ''),
+    cancellationReason: ((row.cancellation_reason as string | null) ?? '').trim() || null,
+    cancelledBy:
+      row.cancelled_by === 'patient' || row.cancelled_by === 'admin'
+        ? row.cancelled_by
+        : null,
   };
 }
 
@@ -116,6 +121,11 @@ function mapOrder(row: Record<string, unknown>): PharmacyOrder {
     status,
     payment: orderPayment(status),
     createdAt: String(row.created_at ?? ''),
+    cancellationReason: ((row.cancellation_reason as string | null) ?? '').trim() || null,
+    cancelledBy:
+      row.cancelled_by === 'patient' || row.cancelled_by === 'admin'
+        ? row.cancelled_by
+        : null,
   };
 }
 
@@ -158,12 +168,14 @@ type StoreApi = LiveState & {
   removeAdmin: (id: string) => Promise<string | null>;
   assignVisit: (id: string, nurseId: string, windowStart: string, windowEnd: string) => Promise<string | null>;
   setVisitStatus: (id: string, status: VisitStatus) => Promise<string | null>;
+  cancelVisit: (id: string, reason: string) => Promise<string | null>;
   setVerification: (
     profileId: string,
     status: Extract<VerificationStatus, 'approved' | 'rejected'>,
     reason?: string,
   ) => Promise<string | null>;
   setOrderStatus: (id: string, status: OrderStatus) => Promise<string | null>;
+  cancelOrder: (id: string, reason: string) => Promise<string | null>;
   toggleNurseAccepting: (id: string) => Promise<string | null>;
   setNurseSuspended: (id: string, suspended: boolean) => Promise<string | null>;
 };
@@ -265,6 +277,7 @@ async function fetchLive(): Promise<LiveState> {
         `
         id, public_code, status, duration_days, estimated_fee_pkr,
         preferred_start_date, preferred_window, description, assigned_nurse_id, patient_id, created_at,
+        cancellation_reason, cancelled_by,
         patient:profiles!visit_requests_patient_id_fkey (full_name, phone),
         service:services (title, requires_prescription),
         address:addresses (line, area_label, label)
@@ -275,7 +288,7 @@ async function fetchLive(): Promise<LiveState> {
       .from('orders')
       .select(
         `
-        id, public_code, status, total_pkr, created_at,
+        id, public_code, status, total_pkr, created_at, cancellation_reason, cancelled_by,
         patient:profiles!orders_patient_id_fkey (full_name),
         order_items (qty, medicines (name))
       `,
@@ -430,6 +443,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return null;
       },
       assignVisit: async (id, nurseId, windowStart, windowEnd) => {
+        const visit = data.visits.find((v) => v.id === id);
+        if (visit?.status === 'cancelled') return 'This visit is cancelled.';
         const nurse = data.nurses.find((n) => n.id === nurseId);
         if (nurse?.suspended) return 'This nurse is suspended and cannot be assigned jobs.';
         const { error: updateError } = await supabase
@@ -445,7 +460,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return null;
       },
       setVisitStatus: async (id, status) => {
+        if (status === 'cancelled') {
+          return 'Use Cancel with a reason to cancel this visit.';
+        }
         const { error: updateError } = await supabase.from('visit_requests').update({ status }).eq('id', id);
+        if (updateError) return updateError.message;
+        await refresh();
+        return null;
+      },
+      cancelVisit: async (id, reason) => {
+        const trimmed = reason.trim();
+        if (!trimmed) return 'Add a cancellation reason.';
+        const { error: updateError } = await supabase
+          .from('visit_requests')
+          .update({ status: 'cancelled', cancellation_reason: trimmed })
+          .eq('id', id)
+          .neq('status', 'cancelled');
         if (updateError) return updateError.message;
         await refresh();
         return null;
@@ -473,7 +503,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return null;
       },
       setOrderStatus: async (id, status) => {
+        if (status === 'cancelled') {
+          return 'Use Cancel with a reason to cancel this order.';
+        }
         const { error: updateError } = await supabase.from('orders').update({ status }).eq('id', id);
+        if (updateError) return updateError.message;
+        await refresh();
+        return null;
+      },
+      cancelOrder: async (id, reason) => {
+        const trimmed = reason.trim();
+        if (!trimmed) return 'Add a cancellation reason.';
+        const { error: updateError } = await supabase
+          .from('orders')
+          .update({ status: 'cancelled', cancellation_reason: trimmed })
+          .eq('id', id)
+          .neq('status', 'cancelled')
+          .neq('status', 'delivered');
         if (updateError) return updateError.message;
         await refresh();
         return null;
